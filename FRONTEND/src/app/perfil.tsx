@@ -1,123 +1,194 @@
 /**
- * Tela de dados pessoais — Incremento 1.
- *
- * Versão sem estilização: mantém apenas a lógica de carregar e salvar o perfil.
+ * Tela de dados pessoais: carrega e salva o nome, o e-mail e o tema preferido da
+ * conta, e reúne a troca de senha e a saída da conta.
  */
 
 import { useEffect, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
-import { AvisoFormulario } from '@/components/AvisoFormulario';
-import { BotaoPrimario } from '@/components/BotaoPrimario';
+import { Botao } from '@/components/Botao';
 import { CampoTexto } from '@/components/CampoTexto';
-import type { Aviso } from '@/hooks/useLogin';
-import { atualizarPerfil, obterPerfil } from '@/services/usuarioService';
+import { Carregando } from '@/components/Carregando';
+import { Cartao } from '@/components/Cartao';
+import { FaixaAviso, type Aviso } from '@/components/FaixaAviso';
+import { Opcao } from '@/components/Opcao';
+import { TelaComCabecalho } from '@/components/TelaComCabecalho';
+import { ESPACO, TIPOGRAFIA } from '@/constants/theme';
+import { ehPreferenciaTema, useTema, type PreferenciaTema } from '@/contexts/TemaContext';
+import { api, removerToken } from '@/services/api';
 import { normalizarEmail, validarEmail, validarNome } from '@/utils/validacao';
+
+type Perfil = { nome: string; email: string; tema?: string };
+
+const OPCOES_TEMA: {
+  valor: PreferenciaTema;
+  titulo: string;
+  icone: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { valor: 'sistema', titulo: 'Sistema', icone: 'phone-portrait-outline' },
+  { valor: 'claro', titulo: 'Claro', icone: 'sunny-outline' },
+  { valor: 'escuro', titulo: 'Escuro', icone: 'moon-outline' },
+];
 
 export default function TelaPerfil() {
   const router = useRouter();
+  const { tema, preferencia, definirPreferencia } = useTema();
   const [nome, definirNome] = useState('');
   const [email, definirEmail] = useState('');
+  const [erros, definirErros] = useState<{ nome: string | null; email: string | null }>({
+    nome: null,
+    email: null,
+  });
+  const [aviso, definirAviso] = useState<Aviso | null>(null);
   const [carregando, definirCarregando] = useState(true);
   const [salvando, definirSalvando] = useState(false);
-  const [aviso, definirAviso] = useState<Aviso | null>(null);
-  const [erros, definirErros] = useState({
-    nome: null as string | null,
-    email: null as string | null,
-  });
 
   useEffect(() => {
-    void obterPerfil().then((resultado) => {
+    let ativa = true;
+
+    void api<Perfil>('/usuarios/me').then((resultado) => {
+      if (!ativa) return;
       definirCarregando(false);
-      if (!resultado.sucesso) {
-        definirAviso({
-          tom: 'erro',
-          titulo: 'Não foi possível carregar',
-          mensagem: resultado.mensagem,
-        });
+      if (!resultado.ok) {
+        definirAviso({ tom: 'erro', titulo: 'Não foi possível carregar', mensagem: resultado.erro });
         return;
       }
       definirNome(resultado.dados.nome);
       definirEmail(resultado.dados.email);
+      if (ehPreferenciaTema(resultado.dados.tema)) definirPreferencia(resultado.dados.tema);
     });
-  }, []);
+
+    return () => {
+      ativa = false;
+    };
+  }, [definirPreferencia]);
 
   async function salvar() {
     const encontrados = { nome: validarNome(nome), email: validarEmail(email) };
     definirErros(encontrados);
+    definirAviso(null);
     if (encontrados.nome || encontrados.email || salvando) return;
 
     definirSalvando(true);
-    const resultado = await atualizarPerfil({ nome: nome.trim(), email: normalizarEmail(email) });
-    definirSalvando(false);
-
-    if (!resultado.sucesso) {
-      definirAviso({
-        tom: 'erro',
-        titulo: 'Não foi possível salvar',
-        mensagem: resultado.mensagem,
-      });
-      return;
-    }
-
-    definirAviso({
-      tom: 'informacao',
-      titulo: 'Perfil atualizado',
-      mensagem: 'Seus dados foram salvos.',
+    const resultado = await api<Perfil>('/usuarios/me', 'PATCH', {
+      nome: nome.trim(),
+      email: normalizarEmail(email),
+      tema: preferencia,
     });
+    definirSalvando(false);
+    definirAviso(
+      resultado.ok
+        ? {
+            tom: 'sucesso',
+            titulo: 'Perfil atualizado',
+            mensagem: 'Seus dados e sua preferência de tema foram salvos.',
+          }
+        : { tom: 'erro', titulo: 'Não foi possível salvar', mensagem: resultado.erro },
+    );
+  }
+
+  async function sair() {
+    await removerToken();
+    // Esvazia a pilha para que o voltar não retorne a telas que exigem login.
+    if (router.canDismiss()) router.dismissAll();
+    router.replace('/login');
   }
 
   return (
-    <ScrollView keyboardShouldPersistTaps="handled">
-      <BotaoPrimario titulo="Voltar" aoTocar={() => router.back()} />
-
-      <Text>Perfil</Text>
-
+    <TelaComCabecalho titulo="Perfil">
       {carregando ? (
-        <Text accessibilityLabel="Carregando perfil">Carregando...</Text>
+        <Carregando rotulo="Carregando perfil" />
       ) : (
-        <View>
-          <Text>Dados pessoais</Text>
-          <Text>Atualize as informações usadas na sua conta.</Text>
+        <Cartao>
+          <Text style={[styles.titulo, { color: tema.cores.texto }]}>Dados pessoais</Text>
+          <Text style={[styles.descricao, { color: tema.cores.textoSuave }]}>
+            Atualize as informações usadas na sua conta.
+          </Text>
 
-          {aviso ? <AvisoFormulario aviso={aviso} /> : null}
+          {aviso ? (
+            <View style={styles.aviso}>
+              <FaixaAviso aviso={aviso} />
+            </View>
+          ) : null}
 
-          <CampoTexto
-            rotulo="Nome"
-            value={nome}
-            onChangeText={(v) => {
-              definirNome(v);
-              definirErros((e) => ({ ...e, nome: null }));
-            }}
-            erro={erros.nome}
-            autoCapitalize="words"
-          />
-          <CampoTexto
-            rotulo="E-mail"
-            value={email}
-            onChangeText={(v) => {
-              definirEmail(v);
-              definirErros((e) => ({ ...e, email: null }));
-            }}
-            erro={erros.email}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+          <View style={styles.campos}>
+            <CampoTexto
+              rotulo="Nome"
+              icone="person-outline"
+              value={nome}
+              onChangeText={(valor) => {
+                definirNome(valor);
+                definirErros((atuais) => ({ ...atuais, nome: null }));
+              }}
+              erro={erros.nome}
+              autoCapitalize="words"
+              editable={!salvando}
+            />
 
-          <BotaoPrimario
+            <CampoTexto
+              rotulo="E-mail"
+              icone="mail-outline"
+              value={email}
+              onChangeText={(valor) => {
+                definirEmail(valor);
+                definirErros((atuais) => ({ ...atuais, email: null }));
+              }}
+              erro={erros.email}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!salvando}
+            />
+          </View>
+
+          <Text style={[styles.rotuloTema, { color: tema.cores.textoSuave }]}>Tema preferido</Text>
+          <View style={styles.opcoesTema}>
+            {OPCOES_TEMA.map((opcao) => (
+              <Opcao
+                key={opcao.valor}
+                titulo={opcao.titulo}
+                icone={opcao.icone}
+                selecionado={preferencia === opcao.valor}
+                aoTocar={() => definirPreferencia(opcao.valor)}
+                desabilitado={salvando}
+                empilhado
+                style={styles.opcaoTema}
+              />
+            ))}
+          </View>
+
+          <Botao
             titulo="Salvar alterações"
             tituloCarregando="Salvando..."
             carregando={salvando}
             aoTocar={salvar}
+            style={styles.botao}
           />
-
-          <BotaoPrimario
+          <Botao
             titulo="Alterar minha senha"
-            aoTocar={() => router.push('/alterar-senha')}
+            variante="secundario"
+            icone="key-outline"
+            aoTocar={() => router.push('/login/alterar-senha')}
+            style={styles.botaoSecundario}
           />
-        </View>
+        </Cartao>
       )}
-    </ScrollView>
+
+      <Botao titulo="Sair da conta" variante="perigo" icone="log-out-outline" aoTocar={sair} />
+    </TelaComCabecalho>
   );
 }
+
+const styles = StyleSheet.create({
+  titulo: { ...TIPOGRAFIA.titulo },
+  descricao: { ...TIPOGRAFIA.corpoPequeno, marginTop: ESPACO.xs },
+  aviso: { marginTop: ESPACO.lg - 4 },
+  campos: { marginTop: ESPACO.lg, gap: ESPACO.md },
+  rotuloTema: { ...TIPOGRAFIA.rotulo, marginTop: ESPACO.lg, marginBottom: ESPACO.sm },
+  opcoesTema: { flexDirection: 'row', gap: ESPACO.sm },
+  opcaoTema: { flex: 1 },
+  botao: { marginTop: ESPACO.lg },
+  botaoSecundario: { marginTop: ESPACO.md - 4 },
+});

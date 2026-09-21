@@ -37,7 +37,7 @@ export class AuthService {
 
     const usuario = await this.usuarioModel
       .findOne({ email })
-      .select('+senhaHash')
+      .select('+senha_hash')
       .exec();
 
     if (!usuario) {
@@ -48,7 +48,7 @@ export class AuthService {
       throw new UnauthorizedException('Usuário desativado');
     }
 
-    const senhaValida = await bcrypt.compare(loginDto.senha, usuario.senhaHash);
+    const senhaValida = await bcrypt.compare(loginDto.senha, usuario.senha_hash);
 
     if (!senhaValida) {
       throw new UnauthorizedException('Email ou senha inválidos');
@@ -63,7 +63,7 @@ export class AuthService {
     const accessToken = await this.jwtService.signAsync(payload);
 
     return {
-      accessToken,
+      access_token: accessToken,
 
       usuario: {
         id: usuario._id,
@@ -87,13 +87,13 @@ export class AuthService {
     }
 
     const token = randomBytes(32).toString('hex');
-    usuario.resetSenhaTokenHash = this.hashToken(token);
-    usuario.resetSenhaExpiraEm = new Date(Date.now() + DURACAO_TOKEN_RECUPERACAO_MS);
+    usuario.reset_senha_token_hash = this.hashToken(token);
+    usuario.reset_senha_expira_em = new Date(Date.now() + DURACAO_TOKEN_RECUPERACAO_MS);
     await usuario.save();
 
     const linkBase =
       this.configService.get<string>('APP_RESET_URL') ??
-      'http://localhost:8081/redefinir-senha';
+      'http://localhost:8081/login/redefinir-senha';
     const link = `${linkBase}?token=${encodeURIComponent(token)}`;
 
     await this.criarTransportador().sendMail({
@@ -115,20 +115,20 @@ export class AuthService {
     const tokenHash = this.hashToken(redefinirSenhaDto.token);
     const usuario = await this.usuarioModel
       .findOne({
-        resetSenhaTokenHash: tokenHash,
-        resetSenhaExpiraEm: { $gt: new Date() },
+        reset_senha_token_hash: tokenHash,
+        reset_senha_expira_em: { $gt: new Date() },
         ativo: true,
       })
-      .select('+senhaHash +resetSenhaTokenHash +resetSenhaExpiraEm')
+      .select('+senha_hash +reset_senha_token_hash +reset_senha_expira_em')
       .exec();
 
     if (!usuario) {
       throw new BadRequestException('O link de recuperação é inválido ou expirou');
     }
 
-    usuario.senhaHash = await bcrypt.hash(redefinirSenhaDto.novaSenha, 10);
-    usuario.resetSenhaTokenHash = undefined;
-    usuario.resetSenhaExpiraEm = undefined;
+    usuario.senha_hash = await bcrypt.hash(redefinirSenhaDto.nova_senha, 10);
+    usuario.reset_senha_token_hash = undefined;
+    usuario.reset_senha_expira_em = undefined;
     await usuario.save();
 
     return { mensagem: 'Senha redefinida com sucesso' };

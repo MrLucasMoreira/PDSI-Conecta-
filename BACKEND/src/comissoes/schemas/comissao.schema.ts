@@ -15,7 +15,7 @@ export class MembroComissao {
     ref: 'Usuario',
     required: true,
   })
-  usuarioId: Types.ObjectId;
+  usuario_id: Types.ObjectId;
 
   @Prop({
     type: String,
@@ -27,16 +27,17 @@ export class MembroComissao {
   @Prop({
     default: Date.now,
   })
-  adicionadoEm: Date;
+  adicionado_em: Date;
 }
 
 export const MembroComissaoSchema =
   SchemaFactory.createForClass(MembroComissao);
 
 @Schema({
+  collection: 'comissoes',
   timestamps: {
-    createdAt: 'criadoEm',
-    updatedAt: 'atualizadoEm',
+    createdAt: 'criado_em',
+    updatedAt: 'atualizado_em',
   },
   versionKey: false,
 })
@@ -55,7 +56,7 @@ export class Comissao {
     ref: 'Organizacao',
     required: true,
   })
-  organizacaoId: Types.ObjectId;
+  organizacao_id: Types.ObjectId;
 
   @Prop({
     type: [MembroComissaoSchema],

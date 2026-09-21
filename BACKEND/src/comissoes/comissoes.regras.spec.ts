@@ -46,9 +46,9 @@ describe('Regras de comissões', () => {
       _id: new Types.ObjectId(organizacaoId),
       status: statusOrganizacao,
       membros: [
-        { usuarioId: new Types.ObjectId(adminId), papel, status: statusMembro },
+        { usuario_id: new Types.ObjectId(adminId), papel, status: statusMembro },
         {
-          usuarioId: new Types.ObjectId(membroId),
+          usuario_id: new Types.ObjectId(membroId),
           papel: 'MEMBRO',
           status: 'APROVADO',
         },
@@ -56,11 +56,11 @@ describe('Regras de comissões', () => {
     };
     const comissao = {
       _id: comissaoId,
-      organizacaoId: new Types.ObjectId(organizacaoId),
+      organizacao_id: new Types.ObjectId(organizacaoId),
       ativo: comissaoAtiva,
       membros: [
         {
-          usuarioId: new Types.ObjectId(membroId),
+          usuario_id: new Types.ObjectId(membroId),
           papel: PapelComissao.MEMBRO,
         },
       ],
@@ -94,7 +94,7 @@ describe('Regras de comissões', () => {
 
   it('permite cadastrar na organização administrada e inicia equipe vazia', async () => {
     const { service, comissoes } = preparar();
-    await service.criar({ nome: 'Eventos', organizacaoId }, adminId);
+    await service.criar({ nome: 'Eventos', organizacao_id: organizacaoId }, adminId);
     expect(comissoes.create).toHaveBeenCalledWith(
       expect.objectContaining({ nome: 'Eventos', membros: [], ativo: true }),
     );
@@ -110,7 +110,7 @@ describe('Regras de comissões', () => {
   ])('impede cadastro sem autorização: %j', async (opcoes) => {
     const { service, comissoes } = preparar(opcoes);
     await expect(
-      service.criar({ nome: 'Eventos', organizacaoId }, adminId),
+      service.criar({ nome: 'Eventos', organizacao_id: organizacaoId }, adminId),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(comissoes.create).not.toHaveBeenCalled();
   });
@@ -128,7 +128,7 @@ describe('Regras de comissões', () => {
       ForbiddenException,
     );
     await expect(
-      service.adicionarMembro(comissaoId, { usuarioId: membroId }, externo),
+      service.adicionarMembro(comissaoId, { usuario_id: membroId }, externo),
     ).rejects.toBeInstanceOf(ForbiddenException);
     await expect(
       service.removerMembro(comissaoId, membroId, externo),
@@ -152,7 +152,7 @@ describe('Regras de comissões', () => {
       expect.objectContaining({
         membros: {
           $elemMatch: {
-            usuarioId: new Types.ObjectId(adminId),
+            usuario_id: new Types.ObjectId(adminId),
             papel: 'ADMIN',
             status: 'APROVADO',
           },
@@ -160,7 +160,7 @@ describe('Regras de comissões', () => {
       }),
     );
     expect(comissoes.find).toHaveBeenCalledWith({
-      organizacaoId: { $in: [new Types.ObjectId(organizacaoId)] },
+      organizacao_id: { $in: [new Types.ObjectId(organizacaoId)] },
     });
   });
 
@@ -183,18 +183,18 @@ describe('Regras de comissões', () => {
   it('rejeita candidato que não é ativo/aprovado na organização', async () => {
     const { service, comissoes } = preparar({ elegivel: false });
     await expect(
-      service.adicionarMembro(comissaoId, { usuarioId: membroId }, adminId),
+      service.adicionarMembro(comissaoId, { usuario_id: membroId }, adminId),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(comissoes.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
   it('inclui integrante com filtro atômico contra duplicação', async () => {
     const { service, comissoes } = preparar();
-    await service.adicionarMembro(comissaoId, { usuarioId: membroId }, adminId);
+    await service.adicionarMembro(comissaoId, { usuario_id: membroId }, adminId);
     expect(comissoes.findOneAndUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         ativo: true,
-        'membros.usuarioId': { $ne: new Types.ObjectId(membroId) },
+        'membros.usuario_id': { $ne: new Types.ObjectId(membroId) },
       }),
       expect.objectContaining({
         $push: {
@@ -205,7 +205,7 @@ describe('Regras de comissões', () => {
     );
     comissoes.findOneAndUpdate.mockReturnValue(consulta(null));
     await expect(
-      service.adicionarMembro(comissaoId, { usuarioId: membroId }, adminId),
+      service.adicionarMembro(comissaoId, { usuario_id: membroId }, adminId),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
@@ -225,7 +225,7 @@ describe('Regras de comissões', () => {
     await service.removerMembro(comissaoId, membroId, adminId);
     expect(comissoes.findOneAndUpdate).toHaveBeenLastCalledWith(
       expect.anything(),
-      { $pull: { membros: { usuarioId: new Types.ObjectId(membroId) } } },
+      { $pull: { membros: { usuario_id: new Types.ObjectId(membroId) } } },
       expect.anything(),
     );
   });
@@ -233,7 +233,7 @@ describe('Regras de comissões', () => {
   it('bloqueia gerenciamento da equipe inativa', async () => {
     const { service, comissoes } = preparar({ comissaoAtiva: false });
     await expect(
-      service.adicionarMembro(comissaoId, { usuarioId: membroId }, adminId),
+      service.adicionarMembro(comissaoId, { usuario_id: membroId }, adminId),
     ).rejects.toBeInstanceOf(BadRequestException);
     await expect(
       service.atualizarMembro(
@@ -267,7 +267,7 @@ describe('Regras de comissões', () => {
     for (const nome of ['  ', 'a', 'a'.repeat(101), null]) {
       expect(
         await validate(
-          plainToInstance(CreateComissaoDto, { nome, organizacaoId }),
+          plainToInstance(CreateComissaoDto, { nome, organizacao_id: organizacaoId }),
         ),
       ).not.toHaveLength(0);
       expect(
@@ -284,7 +284,7 @@ describe('Regras de comissões', () => {
     ).not.toHaveLength(0);
     const dto = plainToInstance(CreateComissaoDto, {
       nome: ' Eventos ',
-      organizacaoId,
+      organizacao_id: organizacaoId,
     });
     expect(await validate(dto)).toHaveLength(0);
     expect(dto.nome).toBe('Eventos');

@@ -27,7 +27,7 @@ export class MembroOrganizacao {
     ref: 'Usuario',
     required: true,
   })
-  usuarioId: Types.ObjectId;
+  usuario_id: Types.ObjectId;
 
   @Prop({
     type: String,
@@ -44,19 +44,20 @@ export class MembroOrganizacao {
   status: StatusMembroOrganizacao;
 
   @Prop({ default: Date.now })
-  solicitadoEm: Date;
+  solicitado_em: Date;
 
   @Prop()
-  aprovadoEm?: Date;
+  aprovado_em?: Date;
 }
 
 export const MembroOrganizacaoSchema =
   SchemaFactory.createForClass(MembroOrganizacao);
 
 @Schema({
+  collection: 'organizacoes',
   timestamps: {
-    createdAt: 'criadoEm',
-    updatedAt: 'atualizadoEm',
+    createdAt: 'criado_em',
+    updatedAt: 'atualizado_em',
   },
 })
 export class Organizacao {
@@ -81,7 +82,7 @@ export class Organizacao {
     ref: 'Usuario',
     required: true,
   })
-  criadaPor: Types.ObjectId;
+  criada_por: Types.ObjectId;
 
   @Prop({
     type: [MembroOrganizacaoSchema],

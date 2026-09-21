@@ -50,16 +50,16 @@ export class OrganizacoesService {
     const organizacao = await this.organizacaoModel.create({
       nome,
       descricao: createOrganizacaoDto.descricao?.trim() || undefined,
-      criadaPor: new Types.ObjectId(usuarioId),
+      criada_por: new Types.ObjectId(usuarioId),
       status: StatusOrganizacao.PENDENTE,
 
       membros: [
         {
-          usuarioId: new Types.ObjectId(usuarioId),
+          usuario_id: new Types.ObjectId(usuarioId),
           papel: PapelOrganizacao.ADMIN,
           status: StatusMembroOrganizacao.APROVADO,
-          solicitadoEm: new Date(),
-          aprovadoEm: new Date(),
+          solicitado_em: new Date(),
+          aprovado_em: new Date(),
         },
       ],
     });
@@ -71,21 +71,21 @@ export class OrganizacoesService {
     if (tipoUsuario === TipoUsuario.ADMIN_SISTEMA) {
       return this.organizacaoModel
         .find()
-        .populate('criadaPor', 'nome email tipo ativo')
-        .sort({ criadoEm: -1 })
+        .populate('criada_por', 'nome email tipo ativo')
+        .sort({ criado_em: -1 })
         .exec();
     }
 
     const organizacoes = await this.organizacaoModel
       .find({ status: StatusOrganizacao.APROVADA })
       .select('nome descricao status membros')
-      .sort({ criadoEm: -1 })
+      .sort({ criado_em: -1 })
       .lean()
       .exec();
 
     return organizacoes.map((organizacao) => {
       const meuVinculo = organizacao.membros.find(
-        (membro) => membro.usuarioId.toString() === usuarioId,
+        (membro) => membro.usuario_id.toString() === usuarioId,
       );
 
       return {
@@ -93,7 +93,7 @@ export class OrganizacoesService {
         nome: organizacao.nome,
         descricao: organizacao.descricao,
         status: organizacao.status,
-        meuVinculo: meuVinculo
+        meu_vinculo: meuVinculo
           ? { papel: meuVinculo.papel, status: meuVinculo.status }
           : null,
       };
@@ -110,8 +110,8 @@ export class OrganizacoesService {
 
     const organizacao = await this.organizacaoModel
       .findById(id)
-      .populate('criadaPor', 'nome email tipo ativo')
-      .populate('membros.usuarioId', 'nome email tipo ativo')
+      .populate('criada_por', 'nome email tipo ativo')
+      .populate('membros.usuario_id', 'nome email tipo ativo')
       .exec();
 
     if (!organizacao) {
@@ -137,8 +137,8 @@ export class OrganizacoesService {
 
     const organizacao = await this.organizacaoModel
       .findByIdAndUpdate(id, dados, { new: true, runValidators: true })
-      .populate('criadaPor', 'nome email tipo ativo')
-      .populate('membros.usuarioId', 'nome email tipo ativo')
+      .populate('criada_por', 'nome email tipo ativo')
+      .populate('membros.usuario_id', 'nome email tipo ativo')
       .exec();
 
     if (!organizacao) {
@@ -192,7 +192,7 @@ export class OrganizacoesService {
     }
 
     const jaExiste = organizacao.membros.some(
-      (membro) => membro.usuarioId.toString() === usuarioId,
+      (membro) => membro.usuario_id.toString() === usuarioId,
     );
 
     if (jaExiste) {
@@ -202,10 +202,10 @@ export class OrganizacoesService {
     }
 
     const membro = {
-      usuarioId: new Types.ObjectId(usuarioId),
+      usuario_id: new Types.ObjectId(usuarioId),
       papel: PapelOrganizacao.MEMBRO,
       status: StatusMembroOrganizacao.PENDENTE,
-      solicitadoEm: new Date(),
+      solicitado_em: new Date(),
     };
     // O filtro evita duplicação mesmo quando duas solicitações chegam juntas.
     const resultado = await this.organizacaoModel
@@ -213,7 +213,7 @@ export class OrganizacoesService {
         {
           _id: id,
           status: StatusOrganizacao.APROVADA,
-          'membros.usuarioId': { $ne: membro.usuarioId },
+          'membros.usuario_id': { $ne: membro.usuario_id },
         },
         { $push: { membros: membro } },
       )
@@ -249,7 +249,7 @@ export class OrganizacoesService {
     }
 
     const membro = organizacao.membros.find(
-      (item) => item.usuarioId.toString() === usuarioId,
+      (item) => item.usuario_id.toString() === usuarioId,
     );
 
     if (!membro) {
@@ -271,7 +271,7 @@ export class OrganizacoesService {
             {
               membros: {
                 $elemMatch: {
-                  usuarioId: new Types.ObjectId(solicitanteId),
+                  usuario_id: new Types.ObjectId(solicitanteId),
                   papel: PapelOrganizacao.ADMIN,
                   status: StatusMembroOrganizacao.APROVADO,
                 },
@@ -280,7 +280,7 @@ export class OrganizacoesService {
             {
               membros: {
                 $elemMatch: {
-                  usuarioId: new Types.ObjectId(usuarioId),
+                  usuario_id: new Types.ObjectId(usuarioId),
                   status: StatusMembroOrganizacao.PENDENTE,
                 },
               },
@@ -291,17 +291,17 @@ export class OrganizacoesService {
           ? {
               $set: {
                 'membros.$[alvo].status': updateStatusDto.status,
-                'membros.$[alvo].aprovadoEm': new Date(),
+                'membros.$[alvo].aprovado_em': new Date(),
               },
             }
           : {
               $set: { 'membros.$[alvo].status': updateStatusDto.status },
-              $unset: { 'membros.$[alvo].aprovadoEm': '' },
+              $unset: { 'membros.$[alvo].aprovado_em': '' },
             },
         {
           arrayFilters: [
             {
-              'alvo.usuarioId': new Types.ObjectId(usuarioId),
+              'alvo.usuario_id': new Types.ObjectId(usuarioId),
               'alvo.status': StatusMembroOrganizacao.PENDENTE,
             },
           ],
@@ -315,7 +315,7 @@ export class OrganizacoesService {
     }
     return {
       mensagem: 'Solicitação analisada',
-      usuarioId,
+      usuario_id: usuarioId,
       status: updateStatusDto.status,
     };
   }
@@ -327,7 +327,7 @@ export class OrganizacoesService {
     if (!organizacao) throw new NotFoundException('Organização não encontrada');
     const administrador = organizacao.membros.some(
       (membro) =>
-        membro.usuarioId.toString() === usuarioId &&
+        membro.usuario_id.toString() === usuarioId &&
         membro.papel === PapelOrganizacao.ADMIN &&
         membro.status === StatusMembroOrganizacao.APROVADO,
     );

@@ -4,7 +4,7 @@ import { PapelComissao } from '../schemas/comissao.schema.js';
 
 export class AddMembroComissaoDto {
   @IsMongoId()
-  usuarioId: string;
+  usuario_id: string;
 
   @IsOptional()
   @IsEnum(PapelComissao)

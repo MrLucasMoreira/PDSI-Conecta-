@@ -109,7 +109,7 @@ describe('Rotas autenticadas de organizações', () => {
     await request(app.getHttpServer())
       .post(`/organizacoes/${orgId}/membros`)
       .auth(token, { type: 'bearer' })
-      .send({ usuarioId: orgId, papel: 'ADMIN' })
+      .send({ usuario_id: orgId, papel: 'ADMIN' })
       .expect(201);
     expect(service.adicionarMembro).toHaveBeenCalledWith(orgId, usuarioId);
   });
@@ -132,7 +132,7 @@ describe('Rotas autenticadas de organizações', () => {
     await request(app.getHttpServer())
       .post('/organizacoes')
       .auth(token, { type: 'bearer' })
-      .send({ nome: 'Minha organização', criadaPor: orgId, status: 'APROVADA' })
+      .send({ nome: 'Minha organização', criada_por: orgId, status: 'APROVADA' })
       .expect(201);
     expect(service.criar).toHaveBeenCalledWith(
       { nome: 'Minha organização' },

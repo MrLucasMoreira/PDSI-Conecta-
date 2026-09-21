@@ -6,5 +6,5 @@ export class RedefinirSenhaDto {
 
   @IsString()
   @MinLength(8)
-  novaSenha: string;
+  nova_senha: string;
 }

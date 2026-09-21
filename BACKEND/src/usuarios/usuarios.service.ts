@@ -56,7 +56,7 @@ export class UsuariosService implements OnApplicationBootstrap {
     await this.usuarioModel.create({
       nome,
       email,
-      senhaHash: await bcrypt.hash(senha, 10),
+      senha_hash: await bcrypt.hash(senha, 10),
       tipo: TipoUsuario.ADMIN_SISTEMA,
     });
   }
@@ -75,7 +75,7 @@ export class UsuariosService implements OnApplicationBootstrap {
     const usuario = await this.usuarioModel.create({
       nome: createUsuarioDto.nome,
       email,
-      senhaHash,
+      senha_hash: senhaHash,
       tema: createUsuarioDto.tema,
     });
 
@@ -83,7 +83,7 @@ export class UsuariosService implements OnApplicationBootstrap {
   }
 
   async listar() {
-    return this.usuarioModel.find().sort({ criadoEm: -1 }).exec();
+    return this.usuarioModel.find().sort({ criado_em: -1 }).exec();
   }
 
   async buscarPorId(id: string) {
@@ -103,7 +103,7 @@ export class UsuariosService implements OnApplicationBootstrap {
 
     const usuario = await this.usuarioModel
       .findById(id)
-      .select('+senhaHash')
+      .select('+senha_hash')
       .exec();
 
     if (!usuario) {
@@ -144,7 +144,7 @@ export class UsuariosService implements OnApplicationBootstrap {
     }
 
     if (updateUsuarioDto.senha) {
-      usuario.senhaHash = await bcrypt.hash(updateUsuarioDto.senha, 10);
+      usuario.senha_hash = await bcrypt.hash(updateUsuarioDto.senha, 10);
     }
 
     await usuario.save();
@@ -189,25 +189,25 @@ export class UsuariosService implements OnApplicationBootstrap {
   async alterarSenha(id: string, alterarSenhaDto: AlterarSenhaDto) {
     this.validarId(id);
 
-    const usuario = await this.usuarioModel.findById(id).select('+senhaHash').exec();
+    const usuario = await this.usuarioModel.findById(id).select('+senha_hash').exec();
 
     if (!usuario) {
       throw new NotFoundException('Usuário não encontrado');
     }
 
-    const senhaAtualValida = await bcrypt.compare(alterarSenhaDto.senhaAtual, usuario.senhaHash);
+    const senhaAtualValida = await bcrypt.compare(alterarSenhaDto.senha_atual, usuario.senha_hash);
 
     if (!senhaAtualValida) {
       throw new BadRequestException('A senha atual está incorreta');
     }
 
-    const senhaRepetida = await bcrypt.compare(alterarSenhaDto.novaSenha, usuario.senhaHash);
+    const senhaRepetida = await bcrypt.compare(alterarSenhaDto.nova_senha, usuario.senha_hash);
 
     if (senhaRepetida) {
       throw new BadRequestException('A nova senha deve ser diferente da senha atual');
     }
 
-    usuario.senhaHash = await bcrypt.hash(alterarSenhaDto.novaSenha, 10);
+    usuario.senha_hash = await bcrypt.hash(alterarSenhaDto.nova_senha, 10);
     await usuario.save();
 
     return { mensagem: 'Senha alterada com sucesso' };

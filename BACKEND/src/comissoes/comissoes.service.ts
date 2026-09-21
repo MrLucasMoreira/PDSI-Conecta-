@@ -59,7 +59,7 @@ export class ComissoesService {
     if (!organizacao) throw new NotFoundException('Organização não encontrada');
     const administrador = organizacao.membros.some(
       (membro) =>
-        membro.usuarioId.toString() === usuarioId &&
+        membro.usuario_id.toString() === usuarioId &&
         membro.papel === PapelOrganizacao.ADMIN &&
         membro.status === StatusMembroOrganizacao.APROVADO,
     );
@@ -76,7 +76,7 @@ export class ComissoesService {
     const comissao = await this.comissaoModel.findById(id).exec();
     if (!comissao) throw new NotFoundException('Comissão não encontrada');
     await this.autorizarOrganizacao(
-      comissao.organizacaoId.toString(),
+      comissao.organizacao_id.toString(),
       usuarioId,
     );
     return comissao;
@@ -84,8 +84,8 @@ export class ComissoesService {
 
   private popular(comissao: ComissaoDocument) {
     return comissao.populate([
-      { path: 'organizacaoId', select: 'nome status' },
-      { path: 'membros.usuarioId', select: 'nome email ativo' },
+      { path: 'organizacao_id', select: 'nome status' },
+      { path: 'membros.usuario_id', select: 'nome email ativo' },
     ]);
   }
 
@@ -96,7 +96,7 @@ export class ComissoesService {
         status: StatusOrganizacao.APROVADA,
         membros: {
           $elemMatch: {
-            usuarioId: new Types.ObjectId(usuarioId),
+            usuario_id: new Types.ObjectId(usuarioId),
             papel: PapelOrganizacao.ADMIN,
             status: StatusMembroOrganizacao.APROVADO,
           },
@@ -114,7 +114,7 @@ export class ComissoesService {
     );
     const ids = organizacao.membros
       .filter((membro) => membro.status === StatusMembroOrganizacao.APROVADO)
-      .map((membro) => membro.usuarioId);
+      .map((membro) => membro.usuario_id);
     return this.usuarioModel
       .find({ _id: { $in: ids }, ativo: true })
       .select('nome email')
@@ -123,11 +123,11 @@ export class ComissoesService {
   }
 
   async criar(dto: CreateComissaoDto, usuarioId: string) {
-    await this.autorizarOrganizacao(dto.organizacaoId, usuarioId);
+    await this.autorizarOrganizacao(dto.organizacao_id, usuarioId);
     const comissao = await this.comissaoModel.create({
       nome: dto.nome,
       descricao: dto.descricao,
-      organizacaoId: new Types.ObjectId(dto.organizacaoId),
+      organizacao_id: new Types.ObjectId(dto.organizacao_id),
       membros: [],
       ativo: true,
     });
@@ -148,10 +148,10 @@ export class ComissoesService {
       );
     }
     return this.comissaoModel
-      .find({ organizacaoId: { $in: ids } })
-      .populate('organizacaoId', 'nome status')
-      .populate('membros.usuarioId', 'nome email ativo')
-      .sort({ criadoEm: -1 })
+      .find({ organizacao_id: { $in: ids } })
+      .populate('organizacao_id', 'nome status')
+      .populate('membros.usuario_id', 'nome email ativo')
+      .sort({ criado_em: -1 })
       .exec();
   }
 
@@ -191,12 +191,12 @@ export class ComissoesService {
       throw new BadRequestException(
         'Reative a comissão antes de gerenciar sua equipe',
       );
-    this.validarId(dto.usuarioId);
+    this.validarId(dto.usuario_id);
     const elegiveis = await this.listarMembrosDisponiveis(
-      comissao.organizacaoId.toString(),
+      comissao.organizacao_id.toString(),
       usuarioId,
     );
-    if (!elegiveis.some((membro) => membro._id.toString() === dto.usuarioId)) {
+    if (!elegiveis.some((membro) => membro._id.toString() === dto.usuario_id)) {
       throw new BadRequestException(
         'O usuário precisa estar ativo e ser membro aprovado da organização',
       );
@@ -207,14 +207,14 @@ export class ComissoesService {
         {
           _id: id,
           ativo: true,
-          'membros.usuarioId': { $ne: new Types.ObjectId(dto.usuarioId) },
+          'membros.usuario_id': { $ne: new Types.ObjectId(dto.usuario_id) },
         },
         {
           $push: {
             membros: {
-              usuarioId: new Types.ObjectId(dto.usuarioId),
+              usuario_id: new Types.ObjectId(dto.usuario_id),
               papel: dto.papel ?? PapelComissao.MEMBRO,
-              adicionadoEm: new Date(),
+              adicionado_em: new Date(),
             },
           },
         },
@@ -240,7 +240,7 @@ export class ComissoesService {
         {
           _id: id,
           ativo: true,
-          'membros.usuarioId': new Types.ObjectId(membroId),
+          'membros.usuario_id': new Types.ObjectId(membroId),
         },
         {
           $set: { 'membros.$.papel': papel },
@@ -262,10 +262,10 @@ export class ComissoesService {
         {
           _id: id,
           ativo: true,
-          'membros.usuarioId': new Types.ObjectId(membroId),
+          'membros.usuario_id': new Types.ObjectId(membroId),
         },
         {
-          $pull: { membros: { usuarioId: new Types.ObjectId(membroId) } },
+          $pull: { membros: { usuario_id: new Types.ObjectId(membroId) } },
         },
         { new: true },
       )
@@ -286,7 +286,7 @@ export class ComissoesService {
       );
     if (
       !comissao.membros.some(
-        (membro) => membro.usuarioId.toString() === membroId,
+        (membro) => membro.usuario_id.toString() === membroId,
       )
     ) {
       throw new NotFoundException('Usuário não pertence a esta comissão');

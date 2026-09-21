@@ -20,5 +20,5 @@ export class CreateComissaoDto {
   descricao?: string;
 
   @IsMongoId({ message: 'Selecione uma organização válida' })
-  organizacaoId: string;
+  organizacao_id: string;
 }

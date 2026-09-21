@@ -1,121 +1,161 @@
-/**
- * Cadastro de uma nova comissão dentro de uma organização administrada.
- *
- * Versão sem estilização: mantém a seleção da organização e o formulário.
- */
+/** Cadastro de uma nova comissão dentro de uma organização administrada. */
 
-import { useEffect, useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { AcaoComissao, ComissaoLayout } from '@/components/ComissaoLayout';
-import { FormularioComissao } from '@/components/FormularioComissao';
-import {
-  criarComissao,
-  listarOrganizacoesComissao,
-  mensagemErroComissao,
-  type OrganizacaoComissao,
-} from '@/services/comissaoService';
+import { Botao } from '@/components/Botao';
+import { CampoTexto } from '@/components/CampoTexto';
+import { Carregando } from '@/components/Carregando';
+import { Cartao } from '@/components/Cartao';
+import { EstadoVazio } from '@/components/EstadoVazio';
+import { FaixaAviso } from '@/components/FaixaAviso';
+import { Opcao } from '@/components/Opcao';
+import { TelaComCabecalho } from '@/components/TelaComCabecalho';
+import { ESPACO, TIPOGRAFIA } from '@/constants/theme';
+import { useTema } from '@/contexts/TemaContext';
+import { api, type Comissao } from '@/services/api';
+import { TAMANHO_MAXIMO_DESCRICAO } from '@/utils/validacao';
 
 export default function TelaNovaComissao() {
   const router = useRouter();
-  const [organizacoes, definirOrganizacoes] = useState<OrganizacaoComissao[]>([]);
+  const { cores } = useTema().tema;
+  const [organizacoes, definirOrganizacoes] = useState<{ _id: string; nome: string }[]>([]);
   const [organizacaoId, definirOrganizacaoId] = useState('');
+  const [nome, definirNome] = useState('');
+  const [descricao, definirDescricao] = useState('');
+  const [erroNome, definirErroNome] = useState<string | null>(null);
+  const [erro, definirErro] = useState('');
   const [carregando, definirCarregando] = useState(true);
   const [salvando, definirSalvando] = useState(false);
-  const bloqueio = useRef(false);
-  const [erro, definirErro] = useState('');
-  const [tentativa, definirTentativa] = useState(0);
 
   useEffect(() => {
-    let atual = true;
-    listarOrganizacoesComissao()
-      .then((orgs) => {
-        if (atual) {
-          definirOrganizacoes(orgs);
-          definirOrganizacaoId(orgs[0]?._id ?? '');
-        }
-      })
-      .catch((e) => {
-        if (atual) definirErro(mensagemErroComissao(e));
-      })
-      .finally(() => {
-        if (atual) definirCarregando(false);
-      });
-    return () => {
-      atual = false;
-    };
-  }, [tentativa]);
+    let ativa = true;
 
-  async function salvar(nome: string, descricao: string) {
-    if (bloqueio.current) return;
-    if (!organizacaoId) {
-      definirErro('Selecione uma organização.');
+    void api<{ _id: string; nome: string }[]>('/comissoes/organizacoes').then((resultado) => {
+      if (!ativa) return;
+      definirCarregando(false);
+      if (!resultado.ok) {
+        definirErro(resultado.erro);
+        return;
+      }
+      definirOrganizacoes(resultado.dados);
+      definirOrganizacaoId(resultado.dados[0]?._id ?? '');
+    });
+
+    return () => {
+      ativa = false;
+    };
+  }, []);
+
+  async function salvar() {
+    if (nome.trim().length < 2) {
+      definirErroNome('Informe um nome com pelo menos 2 caracteres.');
       return;
     }
-    bloqueio.current = true;
+    definirErroNome(null);
+    if (salvando) return;
+
     definirSalvando(true);
     definirErro('');
-    try {
-      const comissao = await criarComissao({ nome, descricao, organizacaoId });
-      router.replace({
-        pathname: '/comissoes/[id]',
-        params: { id: comissao._id, criada: '1' },
-      });
-    } catch (e) {
-      definirErro(mensagemErroComissao(e));
-    } finally {
-      bloqueio.current = false;
-      definirSalvando(false);
+    const resultado = await api<Comissao>('/comissoes', 'POST', {
+      nome: nome.trim(),
+      descricao: descricao.trim(),
+      organizacao_id: organizacaoId,
+    });
+    definirSalvando(false);
+
+    if (!resultado.ok) {
+      definirErro(resultado.erro);
+      return;
     }
+
+    router.replace({
+      pathname: '/comissoes/[id]',
+      params: { id: resultado.dados._id, criada: '1' },
+    });
   }
 
   return (
-    <ComissaoLayout
-      titulo="Nova comissão"
-      carregando={carregando}
-      erro={erro}
-      tentarNovamente={
-        organizacoes.length === 0
-          ? () => {
-              definirCarregando(true);
-              definirErro('');
-              definirTentativa((v) => v + 1);
-            }
-          : undefined
-      }
-    >
-      {organizacoes.length === 0 ? (
-        <Text>
-          Nenhuma organização disponível. É necessário ser administrador aprovado de uma
-          organização autorizada.
-        </Text>
-      ) : (
+    <TelaComCabecalho titulo="Nova comissão">
+      {erro ? <FaixaAviso aviso={{ tom: 'erro', mensagem: erro }} /> : null}
+      {carregando ? <Carregando rotulo="Carregando organizações" /> : null}
+
+      {!carregando && organizacoes.length === 0 ? (
+        <EstadoVazio
+          icone="business-outline"
+          mensagem="Nenhuma organização disponível. É necessário ser administrador aprovado de uma organização autorizada."
+        />
+      ) : null}
+
+      {!carregando && organizacoes.length > 0 ? (
         <>
-          <Text>
+          <Text style={[styles.introducao, { color: cores.textoSuave }]}>
             Selecione a organização e informe os dados da comissão. Depois de salvar, você poderá
             montar a equipe.
           </Text>
-          <Text>Organização *</Text>
-          <View>
-            {organizacoes.map((org) => (
-              <AcaoComissao
-                key={org._id}
-                titulo={`${org._id === organizacaoId ? '✓ ' : ''}${org.nome}`}
-                aoTocar={() => definirOrganizacaoId(org._id)}
-                desabilitado={salvando}
-              />
-            ))}
-          </View>
-          <FormularioComissao
-            salvar={(nome, descricao) => {
-              void salvar(nome, descricao);
-            }}
-            carregando={salvando}
-            titulo="Cadastrar comissão"
-          />
+
+          <Cartao style={styles.cartao}>
+            <View>
+              <Text style={[styles.rotulo, { color: cores.textoSuave }]}>Organização *</Text>
+              <View style={styles.opcoes}>
+                {organizacoes.map((org) => (
+                  <Opcao
+                    key={org._id}
+                    titulo={org.nome}
+                    selecionado={org._id === organizacaoId}
+                    desabilitado={salvando}
+                    aoTocar={() => definirOrganizacaoId(org._id)}
+                    style={styles.opcao}
+                  />
+                ))}
+              </View>
+            </View>
+
+            <CampoTexto
+              rotulo="Nome da comissão *"
+              icone="people-outline"
+              placeholder="Ex.: Comissão de eventos"
+              value={nome}
+              onChangeText={(valor) => {
+                definirNome(valor);
+                definirErroNome(null);
+              }}
+              erro={erroNome}
+              maxLength={100}
+              editable={!salvando}
+            />
+
+            <CampoTexto
+              rotulo="Descrição (opcional)"
+              icone="document-text-outline"
+              placeholder="Descreva o objetivo da comissão"
+              value={descricao}
+              onChangeText={definirDescricao}
+              dica={`${descricao.length}/${TAMANHO_MAXIMO_DESCRICAO}`}
+              maxLength={TAMANHO_MAXIMO_DESCRICAO}
+              multiline
+              editable={!salvando}
+            />
+
+            <Botao
+              titulo="Cadastrar comissão"
+              tituloCarregando="Salvando..."
+              icone="checkmark"
+              carregando={salvando}
+              aoTocar={salvar}
+            />
+          </Cartao>
         </>
-      )}
-    </ComissaoLayout>
+      ) : null}
+    </TelaComCabecalho>
   );
 }
+
+const styles = StyleSheet.create({
+  introducao: { ...TIPOGRAFIA.corpoPequeno },
+  cartao: { gap: ESPACO.md },
+  rotulo: { ...TIPOGRAFIA.rotulo, marginBottom: ESPACO.sm },
+  opcoes: { flexDirection: 'row', flexWrap: 'wrap', gap: ESPACO.sm },
+  opcao: { maxWidth: '100%' },
+});

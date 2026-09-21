@@ -15,9 +15,10 @@ export enum TemaUsuario {
 }
 
 @Schema({
+  collection: 'usuarios',
   timestamps: {
-    createdAt: 'criadoEm',
-    updatedAt: 'atualizadoEm',
+    createdAt: 'criado_em',
+    updatedAt: 'atualizado_em',
   },
 })
 export class Usuario {
@@ -39,7 +40,7 @@ export class Usuario {
     required: true,
     select: false,
   })
-  senhaHash: string;
+  senha_hash: string;
 
   @Prop({
     type: String,
@@ -56,10 +57,10 @@ export class Usuario {
   tema: TemaUsuario;
 
   @Prop({ select: false })
-  resetSenhaTokenHash?: string;
+  reset_senha_token_hash?: string;
 
   @Prop({ select: false })
-  resetSenhaExpiraEm?: Date;
+  reset_senha_expira_em?: Date;
 
   @Prop({
     default: true,

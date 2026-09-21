@@ -41,7 +41,7 @@ export class ComissoesController {
   @Get()
   listar(
     @Req() req: RequisicaoAutenticada,
-    @Query('organizacaoId') organizacaoId?: string,
+    @Query('organizacao_id') organizacaoId?: string,
   ) {
     return this.comissoesService.listar(req.usuario.sub, organizacaoId);
   }

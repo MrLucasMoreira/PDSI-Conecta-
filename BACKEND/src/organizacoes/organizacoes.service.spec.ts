@@ -22,7 +22,7 @@ describe('Permissões e solicitações de organizações', () => {
   let organizacao: {
     status: StatusOrganizacao;
     membros: {
-      usuarioId: Types.ObjectId;
+      usuario_id: Types.ObjectId;
       papel: PapelOrganizacao;
       status: StatusMembroOrganizacao;
     }[];
@@ -40,7 +40,7 @@ describe('Permissões e solicitações de organizações', () => {
       status: StatusOrganizacao.APROVADA,
       membros: [
         {
-          usuarioId: new Types.ObjectId(admin),
+          usuario_id: new Types.ObjectId(admin),
           papel: PapelOrganizacao.ADMIN,
           status: StatusMembroOrganizacao.APROVADO,
         },
@@ -66,10 +66,10 @@ describe('Permissões e solicitações de organizações', () => {
     expect(model.create).toHaveBeenCalledWith(
       expect.objectContaining({
         status: StatusOrganizacao.PENDENTE,
-        criadaPor: new Types.ObjectId(admin),
+        criada_por: new Types.ObjectId(admin),
         membros: [
           expect.objectContaining({
-            usuarioId: new Types.ObjectId(admin),
+            usuario_id: new Types.ObjectId(admin),
             papel: PapelOrganizacao.ADMIN,
           }),
         ],
@@ -106,7 +106,7 @@ describe('Permissões e solicitações de organizações', () => {
 
     expect(model.find).toHaveBeenCalledWith();
     expect(query.populate).toHaveBeenCalledWith(
-      'criadaPor',
+      'criada_por',
       'nome email tipo ativo',
     );
   });
@@ -131,12 +131,12 @@ describe('Permissões e solicitações de organizações', () => {
       {
         _id: orgId,
         status: StatusOrganizacao.APROVADA,
-        'membros.usuarioId': { $ne: new Types.ObjectId(usuario) },
+        'membros.usuario_id': { $ne: new Types.ObjectId(usuario) },
       },
       {
         $push: {
           membros: expect.objectContaining({
-            usuarioId: new Types.ObjectId(usuario),
+            usuario_id: new Types.ObjectId(usuario),
             papel: PapelOrganizacao.MEMBRO,
           }),
         },
@@ -158,7 +158,7 @@ describe('Permissões e solicitações de organizações', () => {
     'não repete vínculo com situação %s',
     async (status) => {
       organizacao.membros.push({
-        usuarioId: new Types.ObjectId(usuario),
+        usuario_id: new Types.ObjectId(usuario),
         papel: PapelOrganizacao.MEMBRO,
         status,
       });
@@ -224,18 +224,18 @@ describe('Permissões e solicitações de organizações', () => {
     StatusMembroOrganizacao.REJEITADO,
   ])('administrador decide como %s', async (status) => {
     organizacao.membros.push({
-      usuarioId: new Types.ObjectId(usuario),
+      usuario_id: new Types.ObjectId(usuario),
       papel: PapelOrganizacao.MEMBRO,
       status: StatusMembroOrganizacao.PENDENTE,
     });
     await expect(
       service.atualizarStatusMembro(orgId, usuario, { status }, admin),
-    ).resolves.toMatchObject({ usuarioId: usuario, status });
+    ).resolves.toMatchObject({ usuario_id: usuario, status });
     const [filtro, alteracao, opcoes] = model.updateOne.mock.calls[0];
     expect(filtro.$and).toContainEqual({
       membros: {
         $elemMatch: {
-          usuarioId: new Types.ObjectId(admin),
+          usuario_id: new Types.ObjectId(admin),
           papel: PapelOrganizacao.ADMIN,
           status: StatusMembroOrganizacao.APROVADO,
         },
@@ -249,7 +249,7 @@ describe('Permissões e solicitações de organizações', () => {
 
   it('não reabre rejeição nem modifica o administrador aprovado', async () => {
     organizacao.membros.push({
-      usuarioId: new Types.ObjectId(usuario),
+      usuario_id: new Types.ObjectId(usuario),
       papel: PapelOrganizacao.MEMBRO,
       status: StatusMembroOrganizacao.REJEITADO,
     });
@@ -274,7 +274,7 @@ describe('Permissões e solicitações de organizações', () => {
 
   it('detecta decisão concorrente ou perda de permissão', async () => {
     organizacao.membros.push({
-      usuarioId: new Types.ObjectId(usuario),
+      usuario_id: new Types.ObjectId(usuario),
       papel: PapelOrganizacao.MEMBRO,
       status: StatusMembroOrganizacao.PENDENTE,
     });

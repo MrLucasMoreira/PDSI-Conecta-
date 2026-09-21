@@ -2,9 +2,9 @@ import { IsString, MinLength } from 'class-validator';
 
 export class AlterarSenhaDto {
   @IsString()
-  senhaAtual: string;
+  senha_atual: string;
 
   @IsString()
   @MinLength(8)
-  novaSenha: string;
+  nova_senha: string;
 }
