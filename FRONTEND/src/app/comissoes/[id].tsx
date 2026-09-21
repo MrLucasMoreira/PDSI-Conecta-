@@ -1,15 +1,21 @@
+/**
+ * Gerenciamento de uma comissão e da sua equipe.
+ *
+ * Versão sem estilização: mantém a edição dos dados, a ativação/desativação e
+ * a inclusão, promoção e remoção de integrantes.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+
 import {
   AcaoComissao,
   ComissaoLayout,
   ConfirmacaoComissao,
-  estilosComissao as styles,
 } from '@/components/ComissaoLayout';
 import { FormularioComissao } from '@/components/FormularioComissao';
 import { CampoTexto } from '@/components/CampoTexto';
-import { useTema } from '@/contexts/TemaContext';
 import {
   adicionarMembroComissao,
   alterarPapelComissao,
@@ -29,7 +35,6 @@ export default function TelaDetalhesComissao() {
     id: string;
     criada?: string;
   }>();
-  const { cores } = useTema();
   const [comissao, definirComissao] = useState<Comissao | null>(null);
   const [pessoas, definirPessoas] = useState<PessoaComissao[]>([]);
   const [carregando, definirCarregando] = useState(true);
@@ -37,9 +42,7 @@ export default function TelaDetalhesComissao() {
   const bloqueio = useRef(false);
   const [erro, definirErro] = useState('');
   const [sucesso, definirSucesso] = useState(
-    criada === '1'
-      ? 'Comissão cadastrada! Adicione os integrantes abaixo.'
-      : '',
+    criada === '1' ? 'Comissão cadastrada! Adicione os integrantes abaixo.' : '',
   );
   const [tentativa, definirTentativa] = useState(0);
   const [busca, definirBusca] = useState('');
@@ -49,6 +52,7 @@ export default function TelaDetalhesComissao() {
     executar: () => Promise<Comissao>;
     sucesso: string;
   } | null>(null);
+
   useEffect(() => {
     let atual = true;
     obterComissao(id)
@@ -87,6 +91,7 @@ export default function TelaDetalhesComissao() {
       definirConfirmacao(null);
     }
   }
+
   const disponiveis = pessoas.filter(
     (pessoa) =>
       !comissao?.membros.some((m) => m.usuarioId?._id === pessoa._id) &&
@@ -94,6 +99,7 @@ export default function TelaDetalhesComissao() {
         .toLocaleLowerCase()
         .includes(busca.trim().toLocaleLowerCase()),
   );
+
   return (
     <ComissaoLayout
       titulo="Gerenciar comissão"
@@ -112,13 +118,10 @@ export default function TelaDetalhesComissao() {
     >
       {comissao && (
         <>
-          <View style={[styles.cartao, { backgroundColor: cores.cartao }]}>
-            <Text style={[styles.subtitulo, { color: cores.textoForte }]}>
-              {comissao.nome}
-            </Text>
-            <Text style={{ color: cores.textoMedio }}>
-              {comissao.organizacaoId.nome} ·{' '}
-              {comissao.ativo ? 'Ativa' : 'Inativa'}
+          <View>
+            <Text>{comissao.nome}</Text>
+            <Text>
+              {comissao.organizacaoId.nome} · {comissao.ativo ? 'Ativa' : 'Inativa'}
             </Text>
             <FormularioComissao
               key={comissao._id}
@@ -133,10 +136,7 @@ export default function TelaDetalhesComissao() {
               }}
             />
             <AcaoComissao
-              titulo={
-                comissao.ativo ? 'Desativar comissão' : 'Reativar comissão'
-              }
-              perigo={comissao.ativo}
+              titulo={comissao.ativo ? 'Desativar comissão' : 'Reativar comissão'}
               desabilitado={salvando}
               aoTocar={() =>
                 definirConfirmacao({
@@ -146,57 +146,33 @@ export default function TelaDetalhesComissao() {
                   executar: comissao.ativo
                     ? async () => (await desativarComissao(id)).comissao
                     : () => atualizarComissao(id, { ativo: true }),
-                  sucesso: comissao.ativo
-                    ? 'Comissão desativada.'
-                    : 'Comissão reativada.',
+                  sucesso: comissao.ativo ? 'Comissão desativada.' : 'Comissão reativada.',
                 })
               }
             />
           </View>
-          <Text style={[styles.subtitulo, { color: cores.textoForte }]}>
-            Equipe ({comissao.membros.length})
-          </Text>
-          {!comissao.ativo && (
-            <Text style={{ color: cores.textoMedio }}>
-              Reative a comissão para alterar a equipe.
-            </Text>
-          )}
-          {comissao.membros.length === 0 && (
-            <Text style={{ color: cores.textoMedio }}>
-              Esta comissão ainda não possui integrantes.
-            </Text>
-          )}
+
+          <Text>Equipe ({comissao.membros.length})</Text>
+
+          {!comissao.ativo && <Text>Reative a comissão para alterar a equipe.</Text>}
+
+          {comissao.membros.length === 0 && <Text>Esta comissão ainda não possui integrantes.</Text>}
+
           {comissao.membros.map((membro, indice) => {
             const pessoa = membro.usuarioId;
             return (
-              <View
-                key={pessoa?._id ?? indice}
-                style={[styles.cartao, { backgroundColor: cores.cartao }]}
-              >
-                <Text
-                  style={{
-                    color: cores.textoForte,
-                    fontFamily: 'Poppins_600SemiBold',
-                  }}
-                >
-                  {pessoa?.nome ?? 'Usuário indisponível'}
-                </Text>
-                {!!pessoa && (
-                  <Text style={{ color: cores.textoMedio }}>
-                    {pessoa.email}
-                  </Text>
-                )}
-                <Text style={{ color: cores.textoMedio }}>
+              <View key={pessoa?._id ?? indice}>
+                <Text>{pessoa?.nome ?? 'Usuário indisponível'}</Text>
+                {!!pessoa && <Text>{pessoa.email}</Text>}
+                <Text>
                   {membro.papel === 'RESPONSAVEL' ? 'Responsável' : 'Membro'}
                   {pessoa?.ativo === false ? ' · Usuário inativo' : ''}
                 </Text>
                 {pessoa && (
-                  <View style={styles.linha}>
+                  <View>
                     <AcaoComissao
                       titulo={
-                        membro.papel === 'MEMBRO'
-                          ? 'Tornar responsável'
-                          : 'Tornar membro'
+                        membro.papel === 'MEMBRO' ? 'Tornar responsável' : 'Tornar membro'
                       }
                       desabilitado={salvando || !comissao.ativo}
                       aoTocar={() => {
@@ -205,9 +181,7 @@ export default function TelaDetalhesComissao() {
                             alterarPapelComissao(
                               id,
                               pessoa._id,
-                              membro.papel === 'MEMBRO'
-                                ? 'RESPONSAVEL'
-                                : 'MEMBRO',
+                              membro.papel === 'MEMBRO' ? 'RESPONSAVEL' : 'MEMBRO',
                             ),
                           'Papel do integrante atualizado.',
                         );
@@ -215,7 +189,6 @@ export default function TelaDetalhesComissao() {
                     />
                     <AcaoComissao
                       titulo="Remover"
-                      perigo
                       desabilitado={salvando || !comissao.ativo}
                       aoTocar={() =>
                         definirConfirmacao({
@@ -230,22 +203,19 @@ export default function TelaDetalhesComissao() {
               </View>
             );
           })}
+
           {comissao.ativo && (
             <>
-              <Text style={[styles.subtitulo, { color: cores.textoForte }]}>
-                Adicionar integrante
-              </Text>
-              <Text style={{ color: cores.textoMedio }}>
-                Somente usuários ativos e aprovados nesta organização estão
-                disponíveis.
+              <Text>Adicionar integrante</Text>
+              <Text>
+                Somente usuários ativos e aprovados nesta organização estão disponíveis.
               </Text>
               <CampoTexto
                 rotulo="Buscar por nome ou e-mail"
-                icone="search-outline"
                 value={busca}
                 onChangeText={definirBusca}
               />
-              <View style={styles.linha}>
+              <View>
                 {(['MEMBRO', 'RESPONSAVEL'] as const).map((opcao) => (
                   <AcaoComissao
                     key={opcao}
@@ -256,19 +226,12 @@ export default function TelaDetalhesComissao() {
                 ))}
               </View>
               {disponiveis.length === 0 && (
-                <Text style={{ color: cores.textoMedio }}>
-                  Nenhum integrante disponível para esta busca.
-                </Text>
+                <Text>Nenhum integrante disponível para esta busca.</Text>
               )}
               {disponiveis.map((pessoa) => (
-                <View
-                  key={pessoa._id}
-                  style={[styles.cartao, { backgroundColor: cores.cartao }]}
-                >
-                  <Text style={{ color: cores.textoForte }}>{pessoa.nome}</Text>
-                  <Text style={{ color: cores.textoMedio }}>
-                    {pessoa.email}
-                  </Text>
+                <View key={pessoa._id}>
+                  <Text>{pessoa.nome}</Text>
+                  <Text>{pessoa.email}</Text>
                   <AcaoComissao
                     titulo={`Adicionar ${pessoa.nome}`}
                     desabilitado={salvando}
@@ -283,13 +246,13 @@ export default function TelaDetalhesComissao() {
               ))}
             </>
           )}
+
           <ConfirmacaoComissao
             mensagem={confirmacao?.mensagem}
             carregando={salvando}
             cancelar={() => definirConfirmacao(null)}
             confirmar={() => {
-              if (confirmacao)
-                void executar(confirmacao.executar, confirmacao.sucesso);
+              if (confirmacao) void executar(confirmacao.executar, confirmacao.sucesso);
             }}
           />
         </>

@@ -1,14 +1,16 @@
-/** Tela administrativa para autorizar, revogar e editar organizações. */
+/**
+ * Tela administrativa para autorizar, revogar e editar organizações.
+ *
+ * Versão sem estilização: mantém apenas a lógica do gerenciamento feito pelo
+ * administrador do sistema.
+ */
 
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
+import { BotaoPrimario } from '@/components/BotaoPrimario';
 import { CampoTexto } from '@/components/CampoTexto';
-import { CORES } from '@/constants/theme';
-import { useTema } from '@/contexts/TemaContext';
 import {
   atualizarOrganizacao,
   listarOrganizacoes,
@@ -19,7 +21,6 @@ import { validarDescricaoOrganizacao, validarNomeOrganizacao } from '@/utils/val
 
 export default function TelaGerenciarOrganizacoes() {
   const router = useRouter();
-  const { cores } = useTema();
   const [organizacoes, definirOrganizacoes] = useState<Organizacao[]>([]);
   const [carregando, definirCarregando] = useState(true);
   const [salvandoId, definirSalvandoId] = useState<string | null>(null);
@@ -99,141 +100,91 @@ export default function TelaGerenciarOrganizacoes() {
   }
 
   return (
-    <SafeAreaView style={[styles.tela, { backgroundColor: cores.fundo }]}>
-      <View style={styles.cabecalho}>
-        <Pressable
-          onPress={() => router.back()}
-          style={[styles.voltar, { backgroundColor: cores.cartao }]}
-          accessibilityRole="button"
-          accessibilityLabel="Voltar"
-        >
-          <Ionicons name="arrow-back" size={20} color={cores.textoForte} />
-        </Pressable>
-        <Text style={[styles.titulo, { color: cores.textoForte }]}>Gerenciar organizações</Text>
-      </View>
+    <ScrollView keyboardShouldPersistTaps="handled">
+      <BotaoPrimario titulo="Voltar" aoTocar={() => router.back()} />
 
-      <ScrollView contentContainerStyle={styles.conteudo} keyboardShouldPersistTaps="handled">
-        {carregando ? <ActivityIndicator color={CORES.AZUL} /> : null}
-        {erro ? (
-          <View style={styles.blocoErro}>
-            <Text style={styles.erro}>{erro}</Text>
-            <Pressable onPress={() => void carregar()} accessibilityRole="button">
-              <Text style={styles.tentarNovamente}>Tentar novamente</Text>
-            </Pressable>
-          </View>
-        ) : null}
-        {!carregando && !erro && organizacoes.length === 0 ? (
-          <Text style={[styles.texto, { color: cores.textoMedio }]}>Nenhuma organização cadastrada.</Text>
-        ) : null}
+      <Text>Gerenciar organizações</Text>
 
-        {organizacoes.map((organizacao) => {
-          const salvando = salvandoId === organizacao._id;
+      {carregando ? <Text accessibilityLabel="Carregando">Carregando...</Text> : null}
 
-          return (
-            <View key={organizacao._id} style={[styles.cartao, { backgroundColor: cores.cartao }]}>
-              {editandoId === organizacao._id ? (
-                <>
-                  <CampoTexto rotulo="Nome" icone="business-outline" value={nome} onChangeText={definirNome} erro={erroNome} />
-                  <CampoTexto
-                    rotulo="Descrição"
-                    icone="document-text-outline"
-                    value={descricao}
-                    onChangeText={definirDescricao}
-                    erro={erroDescricao}
-                    multiline
+      {erro ? (
+        <View>
+          <Text accessibilityRole="alert">{erro}</Text>
+          <BotaoPrimario titulo="Tentar novamente" aoTocar={() => void carregar()} />
+        </View>
+      ) : null}
+
+      {!carregando && !erro && organizacoes.length === 0 ? (
+        <Text>Nenhuma organização cadastrada.</Text>
+      ) : null}
+
+      {organizacoes.map((organizacao) => {
+        const salvando = salvandoId === organizacao._id;
+
+        return (
+          <View key={organizacao._id}>
+            {editandoId === organizacao._id ? (
+              <View>
+                <CampoTexto
+                  rotulo="Nome"
+                  value={nome}
+                  onChangeText={definirNome}
+                  erro={erroNome}
+                />
+                <CampoTexto
+                  rotulo="Descrição"
+                  value={descricao}
+                  onChangeText={definirDescricao}
+                  erro={erroDescricao}
+                  multiline
+                />
+
+                <BotaoPrimario
+                  titulo="Salvar"
+                  tituloCarregando="Salvando..."
+                  carregando={salvando}
+                  desabilitado={Boolean(erroNome) || Boolean(erroDescricao)}
+                  aoTocar={() => void salvarEdicao(organizacao._id)}
+                />
+                <BotaoPrimario
+                  titulo="Cancelar"
+                  desabilitado={salvando}
+                  aoTocar={() => definirEditandoId(null)}
+                />
+              </View>
+            ) : (
+              <View>
+                <Text>{organizacao.nome}</Text>
+                {organizacao.descricao ? <Text>{organizacao.descricao}</Text> : null}
+                <Text>Criada por: {organizacao.criadaPor?.nome ?? '-'}</Text>
+                <Text>Situação: {organizacao.status}</Text>
+
+                {organizacao.status !== 'APROVADA' ? (
+                  <BotaoPrimario
+                    titulo="Autorizar"
+                    desabilitado={salvando}
+                    aoTocar={() => void atualizar(organizacao._id, { status: 'APROVADA' })}
                   />
+                ) : null}
 
-                  <View style={styles.botoes}>
-                    <Pressable
-                      onPress={() => void salvarEdicao(organizacao._id)}
-                      disabled={salvando || Boolean(erroNome) || Boolean(erroDescricao)}
-                      accessibilityRole="button"
-                      style={[styles.botao, styles.botaoAutorizar, salvando && styles.desabilitado]}
-                    >
-                      <Text style={[styles.textoBotao, { color: CORES.BRANCO }]}>
-                        {salvando ? 'Salvando...' : 'Salvar'}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => definirEditandoId(null)}
-                      disabled={salvando}
-                      accessibilityRole="button"
-                      style={[styles.botao, styles.botaoSecundario, { borderColor: cores.borda }]}
-                    >
-                      <Text style={[styles.textoBotao, { color: cores.textoMedio }]}>Cancelar</Text>
-                    </Pressable>
-                  </View>
-                </>
-              ) : (
-                <>
-                  <Text style={[styles.nome, { color: cores.textoForte }]}>{organizacao.nome}</Text>
-                  {organizacao.descricao ? (
-                    <Text style={[styles.texto, { color: cores.textoMedio }]}>{organizacao.descricao}</Text>
-                  ) : null}
-                  <Text style={[styles.texto, { color: cores.textoMedio }]}>
-                    Criada por: {organizacao.criadaPor?.nome ?? '-'}
-                  </Text>
-                  <Text style={[styles.texto, { color: cores.textoMedio }]}>Situação: {organizacao.status}</Text>
+                {organizacao.status !== 'REVOGADA' ? (
+                  <BotaoPrimario
+                    titulo="Revogar"
+                    desabilitado={salvando}
+                    aoTocar={() => void atualizar(organizacao._id, { status: 'REVOGADA' })}
+                  />
+                ) : null}
 
-                  <View style={styles.botoes}>
-                    {organizacao.status !== 'APROVADA' ? (
-                      <Pressable
-                        onPress={() => void atualizar(organizacao._id, { status: 'APROVADA' })}
-                        disabled={salvando}
-                        accessibilityRole="button"
-                        style={[styles.botao, styles.botaoAutorizar, salvando && styles.desabilitado]}
-                      >
-                        <Text style={[styles.textoBotao, { color: CORES.BRANCO }]}>Autorizar</Text>
-                      </Pressable>
-                    ) : null}
-
-                    {organizacao.status !== 'REVOGADA' ? (
-                      <Pressable
-                        onPress={() => void atualizar(organizacao._id, { status: 'REVOGADA' })}
-                        disabled={salvando}
-                        accessibilityRole="button"
-                        style={[styles.botao, styles.botaoRevogar, salvando && styles.desabilitado]}
-                      >
-                        <Text style={[styles.textoBotao, { color: CORES.ERRO }]}>Revogar</Text>
-                      </Pressable>
-                    ) : null}
-
-                    <Pressable
-                      onPress={() => editar(organizacao)}
-                      disabled={salvando}
-                      accessibilityRole="button"
-                      style={[styles.botao, styles.botaoSecundario, { borderColor: cores.borda }]}
-                    >
-                      <Text style={[styles.textoBotao, { color: cores.textoMedio }]}>Editar</Text>
-                    </Pressable>
-                  </View>
-                </>
-              )}
-            </View>
-          );
-        })}
-      </ScrollView>
-    </SafeAreaView>
+                <BotaoPrimario
+                  titulo="Editar"
+                  desabilitado={salvando}
+                  aoTocar={() => editar(organizacao)}
+                />
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  tela: { flex: 1 },
-  cabecalho: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 20 },
-  voltar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  titulo: { fontFamily: 'Poppins_600SemiBold', fontSize: 17 },
-  conteudo: { paddingHorizontal: 20, paddingBottom: 20, gap: 12 },
-  blocoErro: { gap: 8 },
-  erro: { fontFamily: 'Poppins_500Medium', fontSize: 13, color: CORES.ERRO },
-  tentarNovamente: { fontFamily: 'Poppins_600SemiBold', fontSize: 13, color: CORES.AZUL },
-  cartao: { padding: 16, borderRadius: 20, gap: 8 },
-  nome: { fontFamily: 'Poppins_600SemiBold', fontSize: 15 },
-  texto: { fontFamily: 'Poppins_400Regular', fontSize: 13 },
-  botoes: { marginTop: 8, flexDirection: 'row', gap: 8 },
-  botao: { flex: 1, minHeight: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
-  botaoAutorizar: { backgroundColor: CORES.AZUL },
-  botaoRevogar: { borderWidth: 1, borderColor: CORES.ERRO },
-  botaoSecundario: { borderWidth: 1 },
-  textoBotao: { fontFamily: 'Poppins_600SemiBold', fontSize: 13, textAlign: 'center' },
-  desabilitado: { opacity: 0.6 },
-});

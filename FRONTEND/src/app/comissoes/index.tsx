@@ -1,15 +1,16 @@
+/**
+ * Lista de comissões das organizações que o usuário administra.
+ *
+ * Versão sem estilização: mantém a busca, o filtro por situação e a navegação.
+ */
+
 import { useCallback, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import {
-  ComissaoLayout,
-  AcaoComissao,
-  estilosComissao as styles,
-} from '@/components/ComissaoLayout';
+
+import { AcaoComissao, ComissaoLayout } from '@/components/ComissaoLayout';
 import { BotaoPrimario } from '@/components/BotaoPrimario';
 import { CampoTexto } from '@/components/CampoTexto';
-import { useTema } from '@/contexts/TemaContext';
 import {
   listarComissoes,
   listarOrganizacoesComissao,
@@ -20,18 +21,14 @@ import {
 
 export default function TelaComissoes() {
   const router = useRouter();
-  const { cores } = useTema();
   const [comissoes, definirComissoes] = useState<Comissao[]>([]);
-  const [organizacoes, definirOrganizacoes] = useState<OrganizacaoComissao[]>(
-    [],
-  );
+  const [organizacoes, definirOrganizacoes] = useState<OrganizacaoComissao[]>([]);
   const [carregando, definirCarregando] = useState(true);
   const [erro, definirErro] = useState('');
   const [busca, definirBusca] = useState('');
-  const [filtro, definirFiltro] = useState<'Todas' | 'Ativas' | 'Inativas'>(
-    'Todas',
-  );
+  const [filtro, definirFiltro] = useState<'Todas' | 'Ativas' | 'Inativas'>('Todas');
   const [tentativa, definirTentativa] = useState(0);
+
   useFocusEffect(
     useCallback(() => {
       let atual = true;
@@ -57,6 +54,7 @@ export default function TelaComissoes() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tentativa]),
   );
+
   const lista = comissoes.filter(
     (c) =>
       `${c.nome} ${c.organizacaoId.nome}`
@@ -64,6 +62,7 @@ export default function TelaComissoes() {
         .includes(busca.trim().toLocaleLowerCase()) &&
       (filtro === 'Todas' || c.ativo === (filtro === 'Ativas')),
   );
+
   return (
     <ComissaoLayout
       titulo="Comissões"
@@ -73,14 +72,11 @@ export default function TelaComissoes() {
     >
       {!erro && (
         <>
-          <Text style={{ color: cores.textoMedio }}>
-            Gerencie as comissões e equipes das organizações que você
-            administra.
-          </Text>
+          <Text>Gerencie as comissões e equipes das organizações que você administra.</Text>
           {organizacoes.length === 0 ? (
-            <Text style={{ color: cores.textoForte }}>
-              Você precisa ser administrador aprovado de uma organização
-              autorizada para cadastrar e gerenciar comissões.
+            <Text>
+              Você precisa ser administrador aprovado de uma organização autorizada para
+              cadastrar e gerenciar comissões.
             </Text>
           ) : (
             <>
@@ -90,11 +86,10 @@ export default function TelaComissoes() {
               />
               <CampoTexto
                 rotulo="Buscar comissão ou organização"
-                icone="search-outline"
                 value={busca}
                 onChangeText={definirBusca}
               />
-              <View style={styles.linha}>
+              <View>
                 {(['Todas', 'Ativas', 'Inativas'] as const).map((opcao) => (
                   <AcaoComissao
                     key={opcao}
@@ -104,7 +99,7 @@ export default function TelaComissoes() {
                 ))}
               </View>
               {lista.length === 0 && (
-                <Text style={{ color: cores.textoMedio }}>
+                <Text>
                   {comissoes.length === 0
                     ? 'Nenhuma comissão cadastrada. Toque em Nova comissão para começar.'
                     : 'Nenhuma comissão encontrada para este filtro.'}
@@ -121,35 +116,14 @@ export default function TelaComissoes() {
                       params: { id: comissao._id },
                     })
                   }
-                  style={[styles.cartao, { backgroundColor: cores.cartao }]}
                 >
-                  <View style={styles.linha}>
-                    <Ionicons
-                      name="people-outline"
-                      size={22}
-                      color={cores.textoForte}
-                    />
-                    <Text
-                      style={[
-                        styles.subtitulo,
-                        { color: cores.textoForte, flex: 1 },
-                      ]}
-                    >
-                      {comissao.nome}
-                    </Text>
-                  </View>
-                  <Text style={{ color: cores.textoMedio }}>
-                    {comissao.organizacaoId.nome}
+                  <Text>{comissao.nome}</Text>
+                  <Text>{comissao.organizacaoId.nome}</Text>
+                  <Text>
+                    {comissao.ativo ? 'Ativa' : 'Inativa'} · {comissao.membros.length}{' '}
+                    integrante(s)
                   </Text>
-                  <Text style={{ color: cores.textoMedio }}>
-                    {comissao.ativo ? 'Ativa' : 'Inativa'} ·{' '}
-                    {comissao.membros.length} integrante(s)
-                  </Text>
-                  {!!comissao.descricao && (
-                    <Text numberOfLines={2} style={{ color: cores.textoMedio }}>
-                      {comissao.descricao}
-                    </Text>
-                  )}
+                  {!!comissao.descricao && <Text numberOfLines={2}>{comissao.descricao}</Text>}
                 </Pressable>
               ))}
             </>

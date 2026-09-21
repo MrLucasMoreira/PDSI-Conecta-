@@ -1,4 +1,3 @@
-import { TEMAS, type TemaUsuario } from '@/models/usuario';
 import { URL_API } from '@/services/authService';
 import { obterToken } from '@/services/sessaoService';
 
@@ -6,7 +5,6 @@ export type PerfilUsuario = {
   id: string;
   nome: string;
   email: string;
-  tema: TemaUsuario;
 };
 
 type Resultado<T> = { sucesso: true; dados: T } | { sucesso: false; mensagem: string };
@@ -41,11 +39,7 @@ export async function requisicaoAutenticada<T>(caminho: string, init?: RequestIn
 }
 
 function normalizarPerfil(dados: PerfilUsuario & { _id?: string }): PerfilUsuario {
-  const tema =
-    dados.tema === TEMAS.CLARO || dados.tema === TEMAS.ESCURO || dados.tema === TEMAS.SISTEMA
-      ? dados.tema
-      : TEMAS.SISTEMA;
-  return { ...dados, id: dados.id ?? dados._id ?? '', tema };
+  return { ...dados, id: dados.id ?? dados._id ?? '' };
 }
 
 export async function obterPerfil(): Promise<Resultado<PerfilUsuario>> {
@@ -58,7 +52,6 @@ export async function obterPerfil(): Promise<Resultado<PerfilUsuario>> {
 export async function atualizarPerfil(dados: {
   nome: string;
   email: string;
-  tema: TemaUsuario;
 }): Promise<Resultado<PerfilUsuario>> {
   const resultado = await requisicaoAutenticada<PerfilUsuario & { _id?: string }>('/usuarios/me', {
     method: 'PATCH',

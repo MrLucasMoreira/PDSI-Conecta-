@@ -1,13 +1,15 @@
+/**
+ * Cadastro de uma nova comissão dentro de uma organização administrada.
+ *
+ * Versão sem estilização: mantém a seleção da organização e o formulário.
+ */
+
 import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import {
-  ComissaoLayout,
-  AcaoComissao,
-  estilosComissao as styles,
-} from '@/components/ComissaoLayout';
+
+import { AcaoComissao, ComissaoLayout } from '@/components/ComissaoLayout';
 import { FormularioComissao } from '@/components/FormularioComissao';
-import { useTema } from '@/contexts/TemaContext';
 import {
   criarComissao,
   listarOrganizacoesComissao,
@@ -17,16 +19,14 @@ import {
 
 export default function TelaNovaComissao() {
   const router = useRouter();
-  const { cores } = useTema();
-  const [organizacoes, definirOrganizacoes] = useState<OrganizacaoComissao[]>(
-    [],
-  );
+  const [organizacoes, definirOrganizacoes] = useState<OrganizacaoComissao[]>([]);
   const [organizacaoId, definirOrganizacaoId] = useState('');
   const [carregando, definirCarregando] = useState(true);
   const [salvando, definirSalvando] = useState(false);
   const bloqueio = useRef(false);
   const [erro, definirErro] = useState('');
   const [tentativa, definirTentativa] = useState(0);
+
   useEffect(() => {
     let atual = true;
     listarOrganizacoesComissao()
@@ -46,6 +46,7 @@ export default function TelaNovaComissao() {
       atual = false;
     };
   }, [tentativa]);
+
   async function salvar(nome: string, descricao: string) {
     if (bloqueio.current) return;
     if (!organizacaoId) {
@@ -68,6 +69,7 @@ export default function TelaNovaComissao() {
       definirSalvando(false);
     }
   }
+
   return (
     <ComissaoLayout
       titulo="Nova comissão"
@@ -84,18 +86,18 @@ export default function TelaNovaComissao() {
       }
     >
       {organizacoes.length === 0 ? (
-        <Text style={{ color: cores.textoMedio }}>
-          Nenhuma organização disponível. É necessário ser administrador
-          aprovado de uma organização autorizada.
+        <Text>
+          Nenhuma organização disponível. É necessário ser administrador aprovado de uma
+          organização autorizada.
         </Text>
       ) : (
         <>
-          <Text style={{ color: cores.textoMedio }}>
-            Selecione a organização e informe os dados da comissão. Depois de
-            salvar, você poderá montar a equipe.
+          <Text>
+            Selecione a organização e informe os dados da comissão. Depois de salvar, você poderá
+            montar a equipe.
           </Text>
-          <Text style={{ color: cores.textoForte }}>Organização *</Text>
-          <View style={styles.linha}>
+          <Text>Organização *</Text>
+          <View>
             {organizacoes.map((org) => (
               <AcaoComissao
                 key={org._id}

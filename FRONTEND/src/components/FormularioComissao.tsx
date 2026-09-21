@@ -30,10 +30,9 @@ export function FormularioComissao({
     salvar(nome.trim(), descricao.trim());
   }
   return (
-    <View style={{ gap: 20 }}>
+    <View>
       <CampoTexto
         rotulo="Nome da comissão *"
-        icone="people-outline"
         value={nome}
         onChangeText={(valor) => {
           definirNome(valor);
@@ -46,7 +45,6 @@ export function FormularioComissao({
       />
       <CampoTexto
         rotulo="Descrição (opcional)"
-        icone="document-text-outline"
         value={descricao}
         onChangeText={definirDescricao}
         maxLength={1000}

@@ -19,21 +19,12 @@ export const STATUS_ACESSO = {
 
 export type StatusAcesso = (typeof STATUS_ACESSO)[keyof typeof STATUS_ACESSO];
 
-export const TEMAS = {
-  CLARO: 'claro',
-  ESCURO: 'escuro',
-  SISTEMA: 'sistema',
-} as const;
-
-export type TemaUsuario = (typeof TEMAS)[keyof typeof TEMAS];
-
 export type Usuario = {
   id: string;
   nome: string;
   email: string;
   /** USUARIO ou ADMIN_SISTEMA (administrador do sistema). */
   tipo: string;
-  tema: TemaUsuario;
   statusAcesso: StatusAcesso;
   /** Nome da organização vinculada, quando o usuário já solicitou acesso a alguma. */
   organizacao: string | null;

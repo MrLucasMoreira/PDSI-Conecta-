@@ -13,7 +13,6 @@ import { STATUS_ACESSO, type StatusAcesso, type Usuario } from '@/models/usuario
 import { ERRO_LOGIN, MENSAGENS_ERRO_LOGIN, entrar } from '@/services/authService';
 import { normalizarEmail, validarEmail, validarSenha } from '@/utils/validacao';
 import { salvarToken } from '@/services/sessaoService';
-import { useTema } from '@/contexts/TemaContext';
 
 export type TomDoAviso = 'erro' | 'alerta' | 'informacao';
 
@@ -64,7 +63,6 @@ function avisoParaStatus(usuario: Usuario): Aviso | null {
 
 export function useLogin() {
   const router = useRouter();
-  const { definirTemaPreferido } = useTema();
 
   const [email, definirEmail] = useState('');
   const [senha, definirSenha] = useState('');
@@ -134,10 +132,7 @@ export function useLogin() {
       return;
     }
 
-    await Promise.all([
-      salvarToken(resultado.token),
-      definirTemaPreferido(resultado.usuario.tema),
-    ]);
+    await salvarToken(resultado.token);
 
     router.replace({
       pathname: '/inicio',
@@ -148,10 +143,9 @@ export function useLogin() {
         organizacao: resultado.usuario.organizacao ?? '',
         email: resultado.usuario.email,
         tipo: resultado.usuario.tipo,
-        tema: resultado.usuario.tema,
       },
     });
-  }, [carregando, definirTemaPreferido, email, senha, router]);
+  }, [carregando, email, senha, router]);
 
   return {
     email,

@@ -11,7 +11,7 @@
  * `EXPO_PUBLIC_API_URL`.
  */
 
-import { TEMAS, type Usuario } from '@/models/usuario';
+import type { Usuario } from '@/models/usuario';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
@@ -125,7 +125,6 @@ async function autenticarNaApi(credenciais: Credenciais): Promise<ResultadoLogin
         nome: string;
         email: string;
         tipo?: string;
-        tema?: string;
         statusAcesso?: Usuario['statusAcesso'];
         organizacao?: string | null;
       };
@@ -148,10 +147,6 @@ async function autenticarNaApi(credenciais: Credenciais): Promise<ResultadoLogin
       tipo: corpo.usuario.tipo ?? 'USUARIO',
       statusAcesso: corpo.usuario.statusAcesso ?? 'ATIVO',
       organizacao: corpo.usuario.organizacao ?? null,
-      tema:
-        corpo.usuario.tema === TEMAS.CLARO || corpo.usuario.tema === TEMAS.ESCURO
-          ? corpo.usuario.tema
-          : TEMAS.SISTEMA,
     };
 
     return {

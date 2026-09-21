@@ -2,7 +2,6 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 const CHAVE_TOKEN = 'conecta_mais_token';
-const CHAVE_TEMA = 'conecta_mais_tema';
 
 function obterArmazenamentoWeb() {
   return typeof window === 'undefined' ? null : window.localStorage;
@@ -44,12 +43,4 @@ export async function obterToken() {
 
 export async function removerToken() {
   await removerItem(CHAVE_TOKEN);
-}
-
-export async function salvarTemaLocal(tema: string) {
-  await salvarItem(CHAVE_TEMA, tema);
-}
-
-export async function obterTemaLocal() {
-  return obterItem(CHAVE_TEMA);
 }
