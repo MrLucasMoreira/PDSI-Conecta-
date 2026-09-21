@@ -15,3 +15,17 @@ export class AdminSistemaGuard implements CanActivate {
     return true;
   }
 }
+
+/** O administrador do sistema só gerencia a plataforma: não cria nem participa de organizações e comissões. */
+@Injectable()
+export class UsuarioComumGuard implements CanActivate {
+  canActivate(context: ExecutionContext) {
+    const requisicao = context.switchToHttp().getRequest<RequisicaoAutenticada>();
+
+    if (requisicao.usuario.tipo === TipoUsuario.ADMIN_SISTEMA) {
+      throw new ForbiddenException('O administrador do sistema não pode realizar esta operação');
+    }
+
+    return true;
+  }
+}

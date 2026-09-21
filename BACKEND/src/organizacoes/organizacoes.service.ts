@@ -22,6 +22,10 @@ import {
   Usuario,
   UsuarioDocument,
 } from '../usuarios/schemas/usuario.schema.js';
+import {
+  Comissao,
+  ComissaoDocument,
+} from '../comissoes/schemas/comissao.schema.js';
 
 import { CreateOrganizacaoDto } from './dto/create-organizacao.dto.js';
 import { UpdateOrganizacaoDto } from './dto/update-organizacao.dto.js';
@@ -35,6 +39,9 @@ export class OrganizacoesService {
 
     @InjectModel(Usuario.name)
     private readonly usuarioModel: Model<UsuarioDocument>,
+
+    @InjectModel(Comissao.name)
+    private readonly comissaoModel: Model<ComissaoDocument>,
   ) {}
 
   async criar(createOrganizacaoDto: CreateOrganizacaoDto, usuarioId: string) {
@@ -76,8 +83,14 @@ export class OrganizacoesService {
         .exec();
     }
 
+    // Aprovadas para solicitar acesso, e as do próprio usuário em qualquer situação para acompanhar o cadastro.
     const organizacoes = await this.organizacaoModel
-      .find({ status: StatusOrganizacao.APROVADA })
+      .find({
+        $or: [
+          { status: StatusOrganizacao.APROVADA },
+          { 'membros.usuario_id': new Types.ObjectId(usuarioId) },
+        ],
+      })
       .select('nome descricao status membros')
       .sort({ criado_em: -1 })
       .lean()
@@ -151,26 +164,26 @@ export class OrganizacoesService {
   async remover(id: string) {
     this.validarId(id);
 
-    const organizacao = await this.organizacaoModel
-      .findByIdAndUpdate(
-        id,
-        {
-          status: StatusOrganizacao.REVOGADA,
-        },
-        {
-          new: true,
-        },
-      )
-      .exec();
+    const organizacao = await this.organizacaoModel.findById(id).exec();
 
     if (!organizacao) {
       throw new NotFoundException('Organização não encontrada');
     }
 
-    return {
-      mensagem: 'Organização revogada com sucesso',
-      organizacao,
-    };
+    // O filtro repete a condição para não excluir uma organização autorizada novamente no meio do caminho.
+    const resultado = await this.organizacaoModel
+      .deleteOne({ _id: id, status: StatusOrganizacao.REVOGADA })
+      .exec();
+
+    if (resultado.deletedCount !== 1) {
+      throw new ConflictException('Revogue a organização antes de excluí-la');
+    }
+
+    await this.comissaoModel
+      .deleteMany({ organizacao_id: new Types.ObjectId(id) })
+      .exec();
+
+    return { mensagem: 'Organização excluída com sucesso' };
   }
 
   async adicionarMembro(id: string, usuarioId: string) {

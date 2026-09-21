@@ -1,7 +1,8 @@
-/** Tela do administrador do sistema: autoriza, revoga e edita as organizações. */
+/** Tela do administrador do sistema: autoriza, revoga, edita e exclui as organizações. */
 
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Botao } from '@/components/Botao';
@@ -9,6 +10,7 @@ import { BotaoIcone } from '@/components/BotaoIcone';
 import { CampoTexto } from '@/components/CampoTexto';
 import { Carregando } from '@/components/Carregando';
 import { Cartao } from '@/components/Cartao';
+import { Confirmacao } from '@/components/Confirmacao';
 import { EstadoVazio } from '@/components/EstadoVazio';
 import { Etiqueta, type TomEtiqueta } from '@/components/Etiqueta';
 import { FaixaAviso } from '@/components/FaixaAviso';
@@ -28,7 +30,11 @@ const SITUACOES: Record<Organizacao['status'], { texto: string; tom: TomEtiqueta
   REVOGADA: { texto: 'Revogada', tom: 'erro' },
 };
 
+/** As que aguardam autorização aparecem primeiro. */
+const ORDEM: Record<Organizacao['status'], number> = { PENDENTE: 0, APROVADA: 1, REVOGADA: 2 };
+
 export default function TelaGerenciarOrganizacoes() {
+  const router = useRouter();
   const { tema } = useTema();
   const { cores } = tema;
   const [organizacoes, definirOrganizacoes] = useState<Organizacao[]>([]);
@@ -38,6 +44,7 @@ export default function TelaGerenciarOrganizacoes() {
   const [editandoId, definirEditandoId] = useState<string | null>(null);
   const [nome, definirNome] = useState('');
   const [descricao, definirDescricao] = useState('');
+  const [excluindo, definirExcluindo] = useState<Organizacao | null>(null);
 
   const erroNome = validarNomeOrganizacao(nome);
   const erroDescricao = validarDescricao(descricao);
@@ -45,8 +52,16 @@ export default function TelaGerenciarOrganizacoes() {
   useEffect(() => {
     let ativa = true;
 
-    void api<Organizacao[]>('/organizacoes').then((resultado) => {
+    void Promise.all([
+      api<{ tipo: string }>('/usuarios/me'),
+      api<Organizacao[]>('/organizacoes'),
+    ]).then(([usuario, resultado]) => {
       if (!ativa) return;
+      // Exclusiva do administrador do sistema, mesmo quando aberta por um link direto.
+      if (usuario.ok && usuario.dados.tipo !== 'ADMIN_SISTEMA') {
+        router.replace('/inicio');
+        return;
+      }
       definirCarregando(false);
       if (resultado.ok) definirOrganizacoes(resultado.dados);
       else definirErro(resultado.erro);
@@ -55,7 +70,7 @@ export default function TelaGerenciarOrganizacoes() {
     return () => {
       ativa = false;
     };
-  }, []);
+  }, [router]);
 
   async function atualizar(id: string, dados: Partial<Organizacao>) {
     definirSalvandoId(id);
@@ -81,6 +96,23 @@ export default function TelaGerenciarOrganizacoes() {
     }
   }
 
+  async function excluir(organizacao: Organizacao) {
+    definirSalvandoId(organizacao._id);
+    definirErro('');
+    const resultado = await api(`/organizacoes/${organizacao._id}`, 'DELETE');
+    definirSalvandoId(null);
+    definirExcluindo(null);
+
+    if (!resultado.ok) {
+      definirErro(resultado.erro);
+      return;
+    }
+
+    definirOrganizacoes((lista) => lista.filter((item) => item._id !== organizacao._id));
+  }
+
+  const ordenadas = [...organizacoes].sort((a, b) => ORDEM[a.status] - ORDEM[b.status]);
+
   return (
     <TelaComCabecalho titulo="Gerenciar organizações">
       {erro ? <FaixaAviso aviso={{ tom: 'erro', mensagem: erro }} /> : null}
@@ -89,7 +121,7 @@ export default function TelaGerenciarOrganizacoes() {
         <EstadoVazio icone="business-outline" mensagem="Nenhuma organização cadastrada." />
       ) : null}
 
-      {organizacoes.map((organizacao) => {
+      {ordenadas.map((organizacao) => {
         const salvando = salvandoId === organizacao._id;
         const situacao = SITUACOES[organizacao.status];
 
@@ -191,11 +223,35 @@ export default function TelaGerenciarOrganizacoes() {
                   aoTocar={() => atualizar(organizacao._id, { status: 'REVOGADA' })}
                   style={styles.botao}
                 />
-              ) : null}
+              ) : (
+                <Botao
+                  titulo="Excluir"
+                  rotuloAcessivel={`Excluir ${organizacao.nome}`}
+                  icone="trash-outline"
+                  variante="perigo"
+                  compacto
+                  desabilitado={salvando}
+                  aoTocar={() => definirExcluindo(organizacao)}
+                  style={styles.botao}
+                />
+              )}
             </View>
           </Cartao>
         );
       })}
+
+      <Confirmacao
+        mensagem={
+          excluindo
+            ? `Excluir ${excluindo.nome}? A organização e as comissões dela serão apagadas de vez.`
+            : undefined
+        }
+        carregando={salvandoId !== null}
+        cancelar={() => definirExcluindo(null)}
+        confirmar={() => {
+          if (excluindo) void excluir(excluindo);
+        }}
+      />
     </TelaComCabecalho>
   );
 }

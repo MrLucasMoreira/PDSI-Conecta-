@@ -19,7 +19,7 @@ import {
   JwtAuthGuard,
   type RequisicaoAutenticada,
 } from '../auth/jwt-auth.guard.js';
-import { AdminSistemaGuard } from '../auth/admin-sistema.guard.js';
+import { AdminSistemaGuard, UsuarioComumGuard } from '../auth/admin-sistema.guard.js';
 import { UsuarioAtivoGuard } from './usuario-ativo.guard.js';
 
 @Controller('organizacoes')
@@ -28,6 +28,7 @@ export class OrganizacoesController {
   constructor(private readonly organizacoesService: OrganizacoesService) {}
 
   @Post()
+  @UseGuards(UsuarioComumGuard)
   criar(
     @Body() createOrganizacaoDto: CreateOrganizacaoDto,
     @Req() requisicao: RequisicaoAutenticada,
@@ -70,6 +71,7 @@ export class OrganizacoesController {
   }
 
   @Post(':id/membros')
+  @UseGuards(UsuarioComumGuard)
   adicionarMembro(
     @Param('id') id: string,
     @Req() requisicao: RequisicaoAutenticada,
@@ -78,6 +80,7 @@ export class OrganizacoesController {
   }
 
   @Patch(':id/membros/:usuarioId')
+  @UseGuards(UsuarioComumGuard)
   atualizarStatusMembro(
     @Param('id') id: string,
     @Param('usuarioId') usuarioId: string,

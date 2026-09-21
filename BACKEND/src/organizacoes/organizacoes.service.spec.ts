@@ -1,4 +1,8 @@
-import { ForbiddenException, ConflictException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Model, Types } from 'mongoose';
 import { OrganizacoesService } from './organizacoes.service.js';
 import {
@@ -9,6 +13,7 @@ import {
 } from './schemas/organizacao.schema.js';
 import { UsuarioDocument } from '../usuarios/schemas/usuario.schema.js';
 import { TipoUsuario } from '../usuarios/schemas/usuario.schema.js';
+import { ComissaoDocument } from '../comissoes/schemas/comissao.schema.js';
 
 const admin = new Types.ObjectId().toString();
 const usuario = new Types.ObjectId().toString();
@@ -30,10 +35,12 @@ describe('Permissões e solicitações de organizações', () => {
   let model: {
     findById: ReturnType<typeof vi.fn>;
     updateOne: ReturnType<typeof vi.fn>;
+    deleteOne: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
     find: ReturnType<typeof vi.fn>;
     exists: ReturnType<typeof vi.fn>;
   };
+  let comissoes: { deleteMany: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     organizacao = {
@@ -49,15 +56,18 @@ describe('Permissões e solicitações de organizações', () => {
     model = {
       findById: vi.fn(() => consulta(organizacao)),
       updateOne: vi.fn(() => consulta({ modifiedCount: 1 })),
+      deleteOne: vi.fn(() => consulta({ deletedCount: 1 })),
       create: vi.fn().mockResolvedValue({}),
       find: vi.fn(),
       exists: vi.fn(() => consulta(null)),
     };
+    comissoes = { deleteMany: vi.fn(() => consulta({ deletedCount: 2 })) };
     service = new OrganizacoesService(
       model as unknown as Model<OrganizacaoDocument>,
       {
         findById: vi.fn(() => consulta({ ativo: true })),
       } as unknown as Model<UsuarioDocument>,
+      comissoes as unknown as Model<ComissaoDocument>,
     );
   });
 
@@ -77,21 +87,75 @@ describe('Permissões e solicitações de organizações', () => {
     );
   });
 
-  it('catálogo lista apenas organizações aprovadas sem divulgar membros', async () => {
+  it('catálogo lista as aprovadas e as do próprio usuário sem divulgar membros', async () => {
     const query = {
       select: vi.fn().mockReturnThis(),
       sort: vi.fn().mockReturnThis(),
       lean: vi.fn().mockReturnThis(),
-      exec: vi.fn().mockResolvedValue([]),
+      exec: vi.fn().mockResolvedValue([
+        {
+          _id: orgId,
+          nome: 'Organização pendente',
+          status: StatusOrganizacao.PENDENTE,
+          membros: [
+            {
+              usuario_id: new Types.ObjectId(usuario),
+              papel: PapelOrganizacao.ADMIN,
+              status: StatusMembroOrganizacao.APROVADO,
+            },
+          ],
+        },
+      ]),
     };
     model.find.mockReturnValue(query);
-    await service.listar(TipoUsuario.USUARIO, usuario);
+    const lista = await service.listar(TipoUsuario.USUARIO, usuario);
     expect(model.find).toHaveBeenCalledWith({
-      status: StatusOrganizacao.APROVADA,
+      $or: [
+        { status: StatusOrganizacao.APROVADA },
+        { 'membros.usuario_id': new Types.ObjectId(usuario) },
+      ],
     });
     expect(query.select).toHaveBeenCalledWith(
       'nome descricao status membros',
     );
+    expect(lista[0]).toEqual({
+      _id: orgId,
+      nome: 'Organização pendente',
+      descricao: undefined,
+      status: StatusOrganizacao.PENDENTE,
+      meu_vinculo: {
+        papel: PapelOrganizacao.ADMIN,
+        status: StatusMembroOrganizacao.APROVADO,
+      },
+    });
+  });
+
+  it('exclui organização revogada junto com suas comissões', async () => {
+    organizacao.status = StatusOrganizacao.REVOGADA;
+
+    await expect(service.remover(orgId)).resolves.toEqual({
+      mensagem: 'Organização excluída com sucesso',
+    });
+    expect(model.deleteOne).toHaveBeenCalledWith({
+      _id: orgId,
+      status: StatusOrganizacao.REVOGADA,
+    });
+    expect(comissoes.deleteMany).toHaveBeenCalledWith({
+      organizacao_id: new Types.ObjectId(orgId),
+    });
+  });
+
+  it('não exclui organização que não está revogada nem uma inexistente', async () => {
+    model.deleteOne.mockReturnValue(consulta({ deletedCount: 0 }));
+    await expect(service.remover(orgId)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+
+    model.findById.mockReturnValue(consulta(null));
+    await expect(service.remover(orgId)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(comissoes.deleteMany).not.toHaveBeenCalled();
   });
 
   it('administrador do sistema lista inclusive organizações pendentes e revogadas', async () => {

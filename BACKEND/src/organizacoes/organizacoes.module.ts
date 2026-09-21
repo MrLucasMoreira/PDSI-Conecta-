@@ -12,6 +12,7 @@ import {
 } from './schemas/organizacao.schema.js';
 
 import { Usuario, UsuarioSchema } from '../usuarios/schemas/usuario.schema.js';
+import { Comissao, ComissaoSchema } from '../comissoes/schemas/comissao.schema.js';
 
 @Module({
   imports: [
@@ -24,6 +25,10 @@ import { Usuario, UsuarioSchema } from '../usuarios/schemas/usuario.schema.js';
       {
         name: Usuario.name,
         schema: UsuarioSchema,
+      },
+      {
+        name: Comissao.name,
+        schema: ComissaoSchema,
       },
     ]),
   ],

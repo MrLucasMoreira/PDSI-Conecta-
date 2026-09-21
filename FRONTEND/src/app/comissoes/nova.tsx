@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Botao } from '@/components/Botao';
 import { CampoTexto } from '@/components/CampoTexto';
@@ -20,6 +20,8 @@ import { TAMANHO_MAXIMO_DESCRICAO } from '@/utils/validacao';
 export default function TelaNovaComissao() {
   const router = useRouter();
   const { cores } = useTema().tema;
+  /** Organização de onde a tela foi aberta; ela já vem escolhida, mas pode ser trocada. */
+  const { organizacao_id: organizacaoInicial } = useLocalSearchParams<{ organizacao_id?: string }>();
   const [organizacoes, definirOrganizacoes] = useState<{ _id: string; nome: string }[]>([]);
   const [organizacaoId, definirOrganizacaoId] = useState('');
   const [nome, definirNome] = useState('');
@@ -40,13 +42,17 @@ export default function TelaNovaComissao() {
         return;
       }
       definirOrganizacoes(resultado.dados);
-      definirOrganizacaoId(resultado.dados[0]?._id ?? '');
+      definirOrganizacaoId(
+        resultado.dados.find((org) => org._id === organizacaoInicial)?._id ??
+          resultado.dados[0]?._id ??
+          '',
+      );
     });
 
     return () => {
       ativa = false;
     };
-  }, []);
+  }, [organizacaoInicial]);
 
   async function salvar() {
     if (nome.trim().length < 2) {

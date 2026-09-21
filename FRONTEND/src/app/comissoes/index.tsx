@@ -1,10 +1,14 @@
-/** Lista das comissões das organizações administradas, com busca e filtro por situação. */
+/**
+ * Lista das comissões das organizações administradas, com busca e filtro por
+ * situação. Aberta a partir de uma organização, mostra também os membros dela.
+ */
 
 import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import { Avatar } from '@/components/Avatar';
 import { Botao } from '@/components/Botao';
 import { CampoTexto } from '@/components/CampoTexto';
 import { Carregando } from '@/components/Carregando';
@@ -16,30 +20,38 @@ import { Opcao } from '@/components/Opcao';
 import { TelaComCabecalho } from '@/components/TelaComCabecalho';
 import { ESPACO, FONTES, TIPOGRAFIA } from '@/constants/theme';
 import { useTema } from '@/contexts/TemaContext';
-import { api, type Comissao } from '@/services/api';
+import { api, type Comissao, type Organizacao } from '@/services/api';
 
 const FILTROS = ['Todas', 'Ativas', 'Inativas'] as const;
+
+type MembroDaOrganizacao = NonNullable<Organizacao['membros']>[number];
 
 export default function TelaComissoes() {
   const router = useRouter();
   const { cores } = useTema().tema;
+  /** Organização escolhida no início; sem ela, a tela reúne todas as que o usuário administra. */
+  const { organizacao_id: organizacaoId } = useLocalSearchParams<{ organizacao_id?: string }>();
   const [comissoes, definirComissoes] = useState<Comissao[]>([]);
   const [organizacoes, definirOrganizacoes] = useState<{ _id: string; nome: string }[]>([]);
   const [carregando, definirCarregando] = useState(true);
   const [erro, definirErro] = useState('');
   const [busca, definirBusca] = useState('');
   const [filtro, definirFiltro] = useState<(typeof FILTROS)[number]>('Todas');
+  const [membros, definirMembros] = useState<MembroDaOrganizacao[]>([]);
+  const [erroMembros, definirErroMembros] = useState('');
 
   useFocusEffect(
     useCallback(() => {
       let ativa = true;
       definirCarregando(true);
       definirErro('');
+      definirErroMembros('');
 
       void Promise.all([
         api<Comissao[]>('/comissoes'),
         api<{ _id: string; nome: string }[]>('/comissoes/organizacoes'),
-      ]).then(([lista, orgs]) => {
+        organizacaoId ? api<Organizacao>(`/organizacoes/${organizacaoId}`) : null,
+      ]).then(([lista, orgs, detalhes]) => {
         if (!ativa) return;
         definirCarregando(false);
         if (!lista.ok) {
@@ -52,16 +64,34 @@ export default function TelaComissoes() {
         }
         definirComissoes(lista.dados);
         definirOrganizacoes(orgs.dados);
+
+        if (detalhes && !detalhes.ok) definirErroMembros(detalhes.erro);
+        if (detalhes?.ok) {
+          // Membros são os que já foram aceitos; pedidos pendentes ficam na tela Membros.
+          definirMembros(
+            (detalhes.dados.membros ?? [])
+              .filter((membro) => membro.status === 'APROVADO')
+              .sort(
+                (a, b) =>
+                  Number(b.papel === 'ADMIN') - Number(a.papel === 'ADMIN') ||
+                  a.usuario_id.nome.localeCompare(b.usuario_id.nome),
+              ),
+          );
+        }
       });
 
       return () => {
         ativa = false;
       };
-    }, []),
+    }, [organizacaoId]),
   );
 
+  const organizacaoAtual = organizacoes.find((org) => org._id === organizacaoId);
+  const doContexto = organizacaoId
+    ? comissoes.filter((comissao) => comissao.organizacao_id._id === organizacaoId)
+    : comissoes;
   const termo = busca.trim().toLocaleLowerCase();
-  const lista = comissoes.filter(
+  const lista = doContexto.filter(
     (comissao) =>
       `${comissao.nome} ${comissao.organizacao_id.nome}`.toLocaleLowerCase().includes(termo) &&
       (filtro === 'Todas' || comissao.ativo === (filtro === 'Ativas')),
@@ -70,7 +100,9 @@ export default function TelaComissoes() {
   return (
     <TelaComCabecalho titulo="Comissões">
       <Text style={[styles.introducao, { color: cores.textoSuave }]}>
-        Gerencie as comissões e equipes das organizações que você administra.
+        {organizacaoAtual
+          ? `Gerencie as comissões e equipes de ${organizacaoAtual.nome}.`
+          : 'Gerencie as comissões e equipes das organizações que você administra.'}
       </Text>
 
       {erro ? <FaixaAviso aviso={{ tom: 'erro', mensagem: erro }} /> : null}
@@ -85,7 +117,17 @@ export default function TelaComissoes() {
 
       {!carregando && !erro && organizacoes.length > 0 ? (
         <>
-          <Botao titulo="Nova comissão" icone="add" aoTocar={() => router.push('/comissoes/nova')} />
+          <Botao
+            titulo="Nova comissão"
+            icone="add"
+            aoTocar={() =>
+              router.push(
+                organizacaoId
+                  ? { pathname: '/comissoes/nova', params: { organizacao_id: organizacaoId } }
+                  : '/comissoes/nova',
+              )
+            }
+          />
 
           <CampoTexto
             rotulo="Buscar comissão ou organização"
@@ -109,9 +151,9 @@ export default function TelaComissoes() {
 
           {lista.length === 0 ? (
             <EstadoVazio
-              icone={comissoes.length === 0 ? 'people-outline' : 'search-outline'}
+              icone={doContexto.length === 0 ? 'people-outline' : 'search-outline'}
               mensagem={
-                comissoes.length === 0
+                doContexto.length === 0
                   ? 'Nenhuma comissão cadastrada. Toque em Nova comissão para começar.'
                   : 'Nenhuma comissão encontrada para este filtro.'
               }
@@ -163,6 +205,41 @@ export default function TelaComissoes() {
               </Cartao>
             );
           })}
+
+          {organizacaoId ? (
+            <>
+              <Text style={[styles.secao, { color: cores.texto }]} accessibilityRole="header">
+                Membros da organização ({membros.length})
+              </Text>
+              {erroMembros ? <FaixaAviso aviso={{ tom: 'erro', mensagem: erroMembros }} /> : null}
+              {!erroMembros && membros.length === 0 ? (
+                <EstadoVazio icone="person-outline" mensagem="A organização ainda não tem membros." />
+              ) : null}
+              {membros.length > 0 ? (
+                <Cartao style={styles.membros}>
+                  {membros.map((membro) => (
+                    <View key={membro.usuario_id._id} style={styles.membro}>
+                      <Avatar nome={membro.usuario_id.nome} />
+                      <View style={styles.dados}>
+                        <Text style={[styles.nomeMembro, { color: cores.texto }]}>
+                          {membro.usuario_id.nome}
+                        </Text>
+                        <Text style={[styles.texto, { color: cores.textoSuave }]}>
+                          {membro.usuario_id.email}
+                        </Text>
+                        <View style={styles.papel}>
+                          <Etiqueta
+                            texto={membro.papel === 'ADMIN' ? 'Administrador' : 'Membro'}
+                            tom={membro.papel === 'ADMIN' ? 'primaria' : 'neutro'}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </Cartao>
+              ) : null}
+            </>
+          ) : null}
         </>
       ) : null}
     </TelaComCabecalho>
@@ -181,4 +258,10 @@ const styles = StyleSheet.create({
   rodape: { flexDirection: 'row', alignItems: 'center', gap: ESPACO.md - 4 },
   integrantes: { flexDirection: 'row', alignItems: 'center', gap: ESPACO.xs },
   legenda: { ...TIPOGRAFIA.legenda },
+  secao: { ...TIPOGRAFIA.subtitulo, marginTop: ESPACO.sm },
+  membros: { gap: ESPACO.md + 4 },
+  membro: { flexDirection: 'row', alignItems: 'center', gap: ESPACO.md - 4 },
+  dados: { flex: 1 },
+  nomeMembro: { fontFamily: FONTES.titulo, fontSize: 15, lineHeight: 22 },
+  papel: { marginTop: ESPACO.xs + 2 },
 });

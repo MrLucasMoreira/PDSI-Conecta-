@@ -6,7 +6,7 @@ import request from 'supertest';
 import { OrganizacoesController } from './organizacoes.controller.js';
 import { OrganizacoesService } from './organizacoes.service.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
-import { AdminSistemaGuard } from '../auth/admin-sistema.guard.js';
+import { AdminSistemaGuard, UsuarioComumGuard } from '../auth/admin-sistema.guard.js';
 import { UsuarioAtivoGuard } from './usuario-ativo.guard.js';
 import { TipoUsuario, Usuario } from '../usuarios/schemas/usuario.schema.js';
 
@@ -36,6 +36,7 @@ describe('Rotas autenticadas de organizações', () => {
       providers: [
         JwtAuthGuard,
         AdminSistemaGuard,
+        UsuarioComumGuard,
         UsuarioAtivoGuard,
         { provide: OrganizacoesService, useValue: service },
         {
@@ -183,5 +184,29 @@ describe('Rotas autenticadas de organizações', () => {
       .auth(token, { type: 'bearer' })
       .send({ status: 'APROVADA' })
       .expect(200);
+  });
+
+  it('impede o administrador do sistema de criar e participar de organizações', async () => {
+    conta!.tipo = TipoUsuario.ADMIN_SISTEMA;
+    const servidor = app.getHttpServer();
+
+    await request(servidor)
+      .post('/organizacoes')
+      .auth(token, { type: 'bearer' })
+      .send({ nome: 'Organização do administrador' })
+      .expect(403);
+    await request(servidor)
+      .post(`/organizacoes/${orgId}/membros`)
+      .auth(token, { type: 'bearer' })
+      .expect(403);
+    await request(servidor)
+      .patch(`/organizacoes/${orgId}/membros/${usuarioId}`)
+      .auth(token, { type: 'bearer' })
+      .send({ status: 'APROVADO' })
+      .expect(403);
+
+    expect(service.criar).not.toHaveBeenCalled();
+    expect(service.adicionarMembro).not.toHaveBeenCalled();
+    expect(service.atualizarStatusMembro).not.toHaveBeenCalled();
   });
 });

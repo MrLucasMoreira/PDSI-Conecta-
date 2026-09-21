@@ -1,31 +1,65 @@
-/** Tela de solicitação de acesso: lista as organizações e acompanha o vínculo. */
+/**
+ * Tela de participação: organizações aprovadas em que o usuário pode pedir para
+ * entrar, com os pedidos pendentes e os recusados separados por filtro.
+ */
 
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { Botao } from '@/components/Botao';
 import { Carregando } from '@/components/Carregando';
 import { Cartao } from '@/components/Cartao';
 import { EstadoVazio } from '@/components/EstadoVazio';
-import { Etiqueta, type TomEtiqueta } from '@/components/Etiqueta';
+import { Etiqueta } from '@/components/Etiqueta';
 import { FaixaAviso, type Aviso } from '@/components/FaixaAviso';
+import { Opcao } from '@/components/Opcao';
 import { TelaComCabecalho } from '@/components/TelaComCabecalho';
 import { ESPACO, FONTES, TIPOGRAFIA } from '@/constants/theme';
 import { useTema } from '@/contexts/TemaContext';
 import { api, type Organizacao } from '@/services/api';
 
-function situacaoDoVinculo(organizacao: Organizacao): { texto: string; tom: TomEtiqueta } | null {
-  const vinculo = organizacao.meu_vinculo;
-  if (!vinculo) return null;
-  if (vinculo.papel === 'ADMIN') return { texto: 'Você administra esta organização', tom: 'primaria' };
-  if (vinculo.status === 'PENDENTE') return { texto: 'Solicitação pendente', tom: 'alerta' };
-  if (vinculo.status === 'APROVADO') return { texto: 'Acesso aprovado', tom: 'sucesso' };
-  return { texto: 'Solicitação rejeitada', tom: 'erro' };
+type Filtro = 'disponiveis' | 'pendentes' | 'recusadas';
+
+const FILTROS: {
+  valor: Filtro;
+  titulo: string;
+  icone: keyof typeof Ionicons.glyphMap;
+  resumo: (quantidade: number) => string;
+  vazio: string;
+}[] = [
+  {
+    valor: 'disponiveis',
+    titulo: 'Disponíveis',
+    icone: 'enter-outline',
+    resumo: (n) => (n === 1 ? '1 organização para pedir acesso.' : `${n} organizações para pedir acesso.`),
+    vazio: 'Não há novas organizações para participar.',
+  },
+  {
+    valor: 'pendentes',
+    titulo: 'Pendentes',
+    icone: 'time-outline',
+    resumo: (n) => (n === 1 ? '1 pedido aguardando análise.' : `${n} pedidos aguardando análise.`),
+    vazio: 'Você não tem pedidos aguardando análise.',
+  },
+  {
+    valor: 'recusadas',
+    titulo: 'Recusadas',
+    icone: 'close-circle-outline',
+    resumo: (n) => (n === 1 ? '1 pedido recusado.' : `${n} pedidos recusados.`),
+    vazio: 'Nenhum pedido foi recusado.',
+  },
+];
+
+function filtroDa(organizacao: Organizacao): Filtro {
+  if (!organizacao.meu_vinculo) return 'disponiveis';
+  return organizacao.meu_vinculo.status === 'PENDENTE' ? 'pendentes' : 'recusadas';
 }
 
 export default function TelaParticiparOrganizacao() {
-  const { tema } = useTema();
+  const { cores } = useTema().tema;
   const [organizacoes, definirOrganizacoes] = useState<Organizacao[]>([]);
+  const [filtro, definirFiltro] = useState<Filtro>('disponiveis');
   const [carregando, definirCarregando] = useState(true);
   const [enviandoId, definirEnviandoId] = useState<string | null>(null);
   const [aviso, definirAviso] = useState<Aviso | null>(null);
@@ -36,8 +70,20 @@ export default function TelaParticiparOrganizacao() {
     void api<Organizacao[]>('/organizacoes').then((resultado) => {
       if (!ativa) return;
       definirCarregando(false);
-      if (resultado.ok) definirOrganizacoes(resultado.dados);
-      else definirAviso({ tom: 'erro', mensagem: resultado.erro });
+      // Onde o usuário já é membro ou administrador aparece só no início.
+      if (resultado.ok) {
+        definirOrganizacoes(
+          resultado.dados.filter(
+            (org) =>
+              org.status === 'APROVADA' &&
+              (!org.meu_vinculo ||
+                org.meu_vinculo.status === 'PENDENTE' ||
+                org.meu_vinculo.status === 'REJEITADO'),
+          ),
+        );
+      } else {
+        definirAviso({ tom: 'erro', mensagem: resultado.erro });
+      }
     });
 
     return () => {
@@ -63,60 +109,85 @@ export default function TelaParticiparOrganizacao() {
           : item,
       ),
     );
-    definirAviso({ tom: 'sucesso', mensagem: `Solicitação enviada para ${organizacao.nome}.` });
+    definirAviso({
+      tom: 'sucesso',
+      titulo: 'Solicitação enviada',
+      mensagem: `O administrador de ${organizacao.nome} vai analisar o pedido. Acompanhe em Pendentes.`,
+    });
   }
+
+  const atual = FILTROS.find((item) => item.valor === filtro)!;
+  const lista = organizacoes.filter((org) => filtroDa(org) === filtro);
 
   return (
     <TelaComCabecalho titulo="Participar de uma organização">
-      <Text style={[styles.introducao, { color: tema.cores.textoSuave }]}>
-        Escolha uma organização aprovada e solicite acesso. O administrador dela vai analisar o
-        pedido.
-      </Text>
+      <View style={styles.filtros}>
+        {FILTROS.map((opcao) => (
+          <Opcao
+            key={opcao.valor}
+            titulo={opcao.titulo}
+            icone={opcao.icone}
+            selecionado={filtro === opcao.valor}
+            aoTocar={() => definirFiltro(opcao.valor)}
+            empilhado
+            style={styles.filtro}
+          />
+        ))}
+      </View>
 
       {aviso ? <FaixaAviso aviso={aviso} /> : null}
       {carregando ? <Carregando rotulo="Carregando organizações" /> : null}
-      {!carregando && organizacoes.length === 0 ? (
-        <EstadoVazio icone="business-outline" mensagem="Nenhuma organização aprovada." />
+
+      {!carregando && lista.length === 0 ? (
+        <EstadoVazio icone={atual.icone} mensagem={atual.vazio} />
+      ) : null}
+      {!carregando && lista.length > 0 ? (
+        <Text style={[styles.resumo, { color: cores.textoSuave }]}>{atual.resumo(lista.length)}</Text>
       ) : null}
 
-      {organizacoes.map((organizacao) => {
-        const situacao = situacaoDoVinculo(organizacao);
+      {lista.map((organizacao) => (
+        <Cartao key={organizacao._id} style={styles.cartao}>
+          <View style={styles.topo}>
+            <View style={[styles.icone, { backgroundColor: cores.primariaSuave }]}>
+              <Ionicons name="business-outline" size={20} color={cores.primaria} />
+            </View>
+            <View style={styles.titulos}>
+              <Text style={[styles.nome, { color: cores.texto }]}>{organizacao.nome}</Text>
+              {filtro === 'pendentes' ? <Etiqueta texto="Solicitação pendente" tom="alerta" /> : null}
+              {filtro === 'recusadas' ? <Etiqueta texto="Solicitação recusada" tom="erro" /> : null}
+            </View>
+          </View>
 
-        return (
-          <Cartao key={organizacao._id} style={styles.cartao}>
-            <Text style={[styles.nome, { color: tema.cores.texto }]}>{organizacao.nome}</Text>
-            {organizacao.descricao ? (
-              <Text style={[styles.texto, { color: tema.cores.textoSuave }]}>
-                {organizacao.descricao}
-              </Text>
-            ) : null}
+          {organizacao.descricao ? (
+            <Text style={[styles.texto, { color: cores.textoSuave }]}>{organizacao.descricao}</Text>
+          ) : null}
 
-            {situacao ? (
-              <View style={styles.rodape}>
-                <Etiqueta texto={situacao.texto} tom={situacao.tom} />
-              </View>
-            ) : (
-              <Botao
-                titulo="Solicitar acesso"
-                tituloCarregando="Enviando..."
-                icone="enter-outline"
-                compacto
-                carregando={enviandoId === organizacao._id}
-                aoTocar={() => solicitar(organizacao)}
-                style={styles.rodape}
-              />
-            )}
-          </Cartao>
-        );
-      })}
+          {filtro === 'disponiveis' ? (
+            <Botao
+              titulo="Pedir para participar"
+              tituloCarregando="Enviando..."
+              rotuloAcessivel={`Pedir para participar de ${organizacao.nome}`}
+              icone="enter-outline"
+              carregando={enviandoId === organizacao._id}
+              aoTocar={() => solicitar(organizacao)}
+              style={styles.botao}
+            />
+          ) : null}
+        </Cartao>
+      ))}
     </TelaComCabecalho>
   );
 }
 
 const styles = StyleSheet.create({
-  introducao: { ...TIPOGRAFIA.corpoPequeno },
-  cartao: { gap: ESPACO.sm },
+  filtros: { flexDirection: 'row', gap: ESPACO.sm },
+  filtro: { flex: 1 },
+  resumo: { ...TIPOGRAFIA.corpoPequeno },
+  cartao: { gap: ESPACO.md - 4 },
+  topo: { flexDirection: 'row', alignItems: 'center', gap: ESPACO.md - 4 },
+  icone: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  titulos: { flex: 1, gap: ESPACO.xs },
   nome: { fontFamily: FONTES.titulo, fontSize: 16, lineHeight: 24 },
   texto: { ...TIPOGRAFIA.corpoPequeno },
-  rodape: { marginTop: ESPACO.sm },
+  botao: { marginTop: ESPACO.xs },
 });

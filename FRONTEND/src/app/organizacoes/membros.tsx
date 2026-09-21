@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Avatar } from '@/components/Avatar';
 import { Botao } from '@/components/Botao';
@@ -20,6 +20,8 @@ export default function TelaMembrosOrganizacao() {
   const router = useRouter();
   const { tema } = useTema();
   const { cores } = tema;
+  /** Organização escolhida no início; sem ela, a tela pede para escolher. */
+  const { organizacao_id: organizacaoInicial } = useLocalSearchParams<{ organizacao_id?: string }>();
   const [administradas, definirAdministradas] = useState<Organizacao[]>([]);
   const [selecionada, definirSelecionada] = useState<Organizacao | null>(null);
   const [carregando, definirCarregando] = useState(true);
@@ -29,24 +31,36 @@ export default function TelaMembrosOrganizacao() {
   useEffect(() => {
     let ativa = true;
 
-    void api<Organizacao[]>('/organizacoes').then((resultado) => {
+    void api<Organizacao[]>('/organizacoes').then(async (resultado) => {
       if (!ativa) return;
-      definirCarregando(false);
       if (!resultado.ok) {
+        definirCarregando(false);
         definirErro(resultado.erro);
         return;
       }
-      definirAdministradas(
-        resultado.dados.filter(
-          (org) => org.meu_vinculo?.papel === 'ADMIN' && org.meu_vinculo.status === 'APROVADO',
-        ),
+      // A lista também traz as organizações do usuário que ainda não foram aprovadas.
+      const lista = resultado.dados.filter(
+        (org) =>
+          org.status === 'APROVADA' &&
+          org.meu_vinculo?.papel === 'ADMIN' &&
+          org.meu_vinculo.status === 'APROVADO',
       );
+      definirAdministradas(lista);
+
+      const escolhida = lista.find((org) => org._id === organizacaoInicial);
+      if (escolhida) {
+        const detalhes = await api<Organizacao>(`/organizacoes/${escolhida._id}`);
+        if (!ativa) return;
+        if (detalhes.ok) definirSelecionada(detalhes.dados);
+        else definirErro(detalhes.erro);
+      }
+      definirCarregando(false);
     });
 
     return () => {
       ativa = false;
     };
-  }, []);
+  }, [organizacaoInicial]);
 
   async function abrir(organizacao: Organizacao) {
     definirCarregando(true);
@@ -87,7 +101,9 @@ export default function TelaMembrosOrganizacao() {
   return (
     <TelaComCabecalho
       titulo={selecionada?.nome ?? 'Membros da organização'}
-      aoVoltar={selecionada ? () => definirSelecionada(null) : () => router.back()}
+      aoVoltar={
+        selecionada && !organizacaoInicial ? () => definirSelecionada(null) : () => router.back()
+      }
     >
       {erro ? <FaixaAviso aviso={{ tom: 'erro', mensagem: erro }} /> : null}
       {carregando ? <Carregando /> : null}
