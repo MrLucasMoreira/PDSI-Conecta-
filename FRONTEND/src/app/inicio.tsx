@@ -118,7 +118,7 @@ export default function TelaInicio() {
         // O administrador do sistema recebe todas; o usuário vê só as que tem vínculo.
         const lista = administradorDoSistema
           ? resultado.dados
-          : resultado.dados.filter((item) => item.meu_vinculo);
+          : resultado.dados.filter((item) => item.meu_vinculo && !(item.meu_vinculo.papel === 'MEMBRO' && (item.meu_vinculo.status === 'PENDENTE' || item.meu_vinculo.status === 'REJEITADO')));
         const administradas = administradorDoSistema ? [] : lista.filter(administra);
         const detalhes = await Promise.all(
           administradas.map((item) => api<Organizacao>(`/organizacoes/${item._id}`)),
