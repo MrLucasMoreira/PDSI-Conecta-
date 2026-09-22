@@ -40,7 +40,7 @@ describe('Permissões e solicitações de organizações', () => {
     find: ReturnType<typeof vi.fn>;
     exists: ReturnType<typeof vi.fn>;
   };
-  let comissoes: { deleteMany: ReturnType<typeof vi.fn> };
+  let comissoes: { deleteMany: ReturnType<typeof vi.fn>; updateMany: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     organizacao = {
@@ -61,7 +61,10 @@ describe('Permissões e solicitações de organizações', () => {
       find: vi.fn(),
       exists: vi.fn(() => consulta(null)),
     };
-    comissoes = { deleteMany: vi.fn(() => consulta({ deletedCount: 2 })) };
+    comissoes = {
+      deleteMany: vi.fn(() => consulta({ deletedCount: 2 })),
+      updateMany: vi.fn(() => consulta({ modifiedCount: 2 })),
+    };
     service = new OrganizacoesService(
       model as unknown as Model<OrganizacaoDocument>,
       {
@@ -69,6 +72,53 @@ describe('Permissões e solicitações de organizações', () => {
       } as unknown as Model<UsuarioDocument>,
       comissoes as unknown as Model<ComissaoDocument>,
     );
+  });
+
+  it('remove vínculo e limpa somente comissões da organização escolhida', async () => {
+    organizacao.membros.push({ usuario_id: new Types.ObjectId(usuario), papel: PapelOrganizacao.MEMBRO, status: StatusMembroOrganizacao.APROVADO });
+    await service.removerMembro(orgId, usuario, admin);
+    expect(model.updateOne).toHaveBeenCalledWith(
+      expect.objectContaining({ _id: orgId, status: StatusOrganizacao.APROVADA, $and: expect.any(Array) }),
+      { $pull: { membros: { usuario_id: new Types.ObjectId(usuario) } } },
+    );
+    expect(comissoes.updateMany).toHaveBeenCalledWith(
+      { organizacao_id: new Types.ObjectId(orgId) },
+      { $pull: { membros: { usuario_id: new Types.ObjectId(usuario) } } },
+    );
+  });
+
+  it('bloqueia remoção por usuário externo e remoção de administrador', async () => {
+    await expect(service.removerMembro(orgId, admin, usuario)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.removerMembro(orgId, admin, admin)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(model.updateOne).not.toHaveBeenCalled();
+    expect(comissoes.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([StatusMembroOrganizacao.PENDENTE, StatusMembroOrganizacao.REJEITADO])('não remove vínculo %s', async (status) => {
+    organizacao.membros.push({ usuario_id: new Types.ObjectId(usuario), papel: PapelOrganizacao.MEMBRO, status });
+    await expect(service.removerMembro(orgId, usuario, admin)).rejects.toBeInstanceOf(ConflictException);
+    expect(comissoes.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('bloqueia remoção em organização revogada', async () => {
+    organizacao.status = StatusOrganizacao.REVOGADA;
+    await expect(service.removerMembro(orgId, usuario, admin)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(comissoes.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('não limpa comissões se as permissões mudarem durante a remoção', async () => {
+    organizacao.membros.push({ usuario_id: new Types.ObjectId(usuario), papel: PapelOrganizacao.MEMBRO, status: StatusMembroOrganizacao.APROVADO });
+    model.updateOne.mockReturnValue(consulta({ modifiedCount: 0 }));
+    await expect(service.removerMembro(orgId, usuario, admin)).rejects.toBeInstanceOf(ConflictException);
+    expect(comissoes.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('permite repetir a limpeza quando o vínculo já foi removido', async () => {
+    comissoes.updateMany.mockReturnValueOnce({ exec: vi.fn().mockRejectedValue(new Error('indisponível')) });
+    await expect(service.removerMembro(orgId, usuario, admin)).rejects.toThrow('indisponível');
+    await expect(service.removerMembro(orgId, usuario, admin)).resolves.toHaveProperty('mensagem');
+    expect(model.updateOne).not.toHaveBeenCalled();
+    expect(comissoes.updateMany).toHaveBeenCalledTimes(2);
   });
 
   it('cria organização pendente com o administrador identificado pela sessão', async () => {

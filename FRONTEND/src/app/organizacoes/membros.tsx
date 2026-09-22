@@ -8,6 +8,7 @@ import { Avatar } from '@/components/Avatar';
 import { Botao } from '@/components/Botao';
 import { Carregando } from '@/components/Carregando';
 import { Cartao } from '@/components/Cartao';
+import { Confirmacao } from '@/components/Confirmacao';
 import { EstadoVazio } from '@/components/EstadoVazio';
 import { Etiqueta } from '@/components/Etiqueta';
 import { FaixaAviso } from '@/components/FaixaAviso';
@@ -28,6 +29,9 @@ export default function TelaMembrosOrganizacao() {
   const [carregando, definirCarregando] = useState(true);
   const [salvandoId, definirSalvandoId] = useState<string | null>(null);
   const [erro, definirErro] = useState('');
+  const [removendo, definirRemovendo] = useState(false);
+  const [alvoRemocao, definirAlvoRemocao] = useState<{ _id: string; nome: string } | null>(null);
+  const [sucesso, definirSucesso] = useState('');
 
   useEffect(() => {
     let ativa = true;
@@ -101,6 +105,25 @@ export default function TelaMembrosOrganizacao() {
     );
   }
 
+  async function removerMembro() {
+    if (!selecionada || !alvoRemocao || removendo) return;
+    definirRemovendo(true);
+    definirErro('');
+    definirSucesso('');
+    const resultado = await api(`/organizacoes/${selecionada._id}/membros/${alvoRemocao._id}`, 'DELETE');
+    definirRemovendo(false);
+    if (!resultado.ok) {
+      definirAlvoRemocao(null);
+      definirErro(resultado.erro);
+      return;
+    }
+    definirSelecionada((atual) => atual?._id === selecionada._id
+      ? { ...atual, membros: atual.membros?.filter((item) => item.usuario_id._id !== alvoRemocao._id) }
+      : atual);
+    definirSucesso(`O acesso de ${alvoRemocao.nome} foi removido desta organização e de suas comissões.`);
+    definirAlvoRemocao(null);
+  }
+
   const pendentes = selecionada?.membros?.filter((membro) => membro.status === 'PENDENTE') ?? [];
   const aprovados = (selecionada?.membros?.filter((membro) => membro.status === 'APROVADO') ?? [])
     .sort((a, b) =>
@@ -116,6 +139,7 @@ export default function TelaMembrosOrganizacao() {
       }
     >
       {erro ? <FaixaAviso aviso={{ tom: 'erro', mensagem: erro }} /> : null}
+      {sucesso ? <FaixaAviso aviso={{ tom: 'sucesso', mensagem: sucesso }} /> : null}
       {carregando ? <Carregando /> : null}
 
       {!selecionada && !carregando ? (
@@ -230,10 +254,29 @@ export default function TelaMembrosOrganizacao() {
                   </View>
                 </View>
               </View>
+              {membro.papel === 'MEMBRO' ? (
+                <Botao
+                  titulo="Remover acesso"
+                  rotuloAcessivel={`Remover acesso de ${membro.usuario_id.nome}`}
+                  variante="perigo"
+                  icone="person-remove-outline"
+                  compacto
+                  desabilitado={removendo || salvandoId !== null}
+                  aoTocar={() => definirAlvoRemocao(membro.usuario_id)}
+                />
+              ) : null}
             </Cartao>
           ))}
         </>
       ) : null}
+      <Confirmacao
+        mensagem={alvoRemocao && selecionada
+          ? `Remover o acesso de ${alvoRemocao.nome} a ${selecionada.nome}? A pessoa também sairá das comissões desta organização. Sua conta e os vínculos com outras organizações serão preservados. Para voltar, precisará solicitar acesso e ser aprovada novamente.`
+          : undefined}
+        confirmar={removerMembro}
+        cancelar={() => definirAlvoRemocao(null)}
+        carregando={removendo}
+      />
     </TelaComCabecalho>
   );
 }

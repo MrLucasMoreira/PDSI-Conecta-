@@ -79,6 +79,16 @@ export class OrganizacoesController {
     return this.organizacoesService.adicionarMembro(id, requisicao.usuario.sub);
   }
 
+  @Delete(':id/membros/:usuarioId')
+  @UseGuards(UsuarioComumGuard)
+  removerMembro(
+    @Param('id') id: string,
+    @Param('usuarioId') usuarioId: string,
+    @Req() requisicao: RequisicaoAutenticada,
+  ) {
+    return this.organizacoesService.removerMembro(id, usuarioId, requisicao.usuario.sub);
+  }
+
   @Patch(':id/membros/:usuarioId')
   @UseGuards(UsuarioComumGuard)
   atualizarStatusMembro(

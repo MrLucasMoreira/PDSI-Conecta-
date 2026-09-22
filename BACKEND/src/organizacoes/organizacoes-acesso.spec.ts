@@ -25,6 +25,7 @@ describe('Rotas autenticadas de organizações', () => {
     remover: vi.fn().mockResolvedValue({}),
     adicionarMembro: vi.fn().mockResolvedValue({}),
     atualizarStatusMembro: vi.fn().mockResolvedValue({}),
+    removerMembro: vi.fn().mockResolvedValue({}),
   };
 
   beforeEach(async () => {
@@ -82,6 +83,20 @@ describe('Rotas autenticadas de organizações', () => {
       .patch(`/organizacoes/${orgId}/membros/${usuarioId}`)
       .send({ status: 'APROVADO' })
       .expect(401);
+  });
+
+  it('protege a remoção e encaminha a identidade autenticada', async () => {
+    const servidor = app.getHttpServer();
+    const rota = `/organizacoes/${orgId}/membros/${orgId}`;
+    await request(servidor).delete(rota).expect(401);
+    await request(servidor).delete(rota).auth(token, { type: 'bearer' }).expect(200);
+    expect(service.removerMembro).toHaveBeenCalledWith(orgId, orgId, usuarioId);
+    service.removerMembro.mockClear();
+    conta!.tipo = TipoUsuario.ADMIN_SISTEMA;
+    await request(servidor).delete(rota).auth(token, { type: 'bearer' }).expect(403);
+    conta!.ativo = false;
+    await request(servidor).delete(rota).auth(token, { type: 'bearer' }).expect(401);
+    expect(service.removerMembro).not.toHaveBeenCalled();
   });
 
   it('recusa tokens inválidos, expirados e contas desativadas ou excluídas', async () => {

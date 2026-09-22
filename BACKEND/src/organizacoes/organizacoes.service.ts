@@ -333,6 +333,49 @@ export class OrganizacoesService {
     };
   }
 
+  async removerMembro(id: string, usuarioId: string, solicitanteId: string) {
+    this.validarId(usuarioId);
+    const organizacao = await this.exigirAdministrador(id, solicitanteId);
+    this.exigirOrganizacaoAprovada(organizacao);
+    const membro = organizacao.membros.find((item) => item.usuario_id.toString() === usuarioId);
+    if (membro?.papel === PapelOrganizacao.ADMIN) {
+      throw new ForbiddenException('Não é permitido remover administradores da organização');
+    }
+    if (membro && membro.status !== StatusMembroOrganizacao.APROVADO) {
+      throw new ConflictException('Apenas membros aprovados podem ser removidos');
+    }
+    if (membro) {
+      const resultado = await this.organizacaoModel.updateOne(
+        {
+          _id: id,
+          status: StatusOrganizacao.APROVADA,
+          $and: [
+            { membros: { $elemMatch: {
+              usuario_id: new Types.ObjectId(solicitanteId),
+              papel: PapelOrganizacao.ADMIN,
+              status: StatusMembroOrganizacao.APROVADO,
+            } } },
+            { membros: { $elemMatch: {
+              usuario_id: new Types.ObjectId(usuarioId),
+              papel: PapelOrganizacao.MEMBRO,
+              status: StatusMembroOrganizacao.APROVADO,
+            } } },
+          ],
+        },
+        { $pull: { membros: { usuario_id: new Types.ObjectId(usuarioId) } } },
+      ).exec();
+      if (resultado.modifiedCount !== 1) {
+        throw new ConflictException('O vínculo ou as permissões mudaram. Atualize a lista');
+      }
+    }
+    // Revoga primeiro o acesso. Uma repetição pode concluir a limpeza se ela falhar.
+    await this.comissaoModel.updateMany(
+      { organizacao_id: new Types.ObjectId(id) },
+      { $pull: { membros: { usuario_id: new Types.ObjectId(usuarioId) } } },
+    ).exec();
+    return { mensagem: 'Acesso à organização removido com sucesso' };
+  }
+
   private async exigirAdministrador(id: string, usuarioId: string) {
     this.validarId(id);
     this.validarId(usuarioId);
