@@ -1,4 +1,4 @@
-/** Tela de análise das solicitações de acesso das organizações que o usuário administra. */
+/** Membros aprovados e solicitações de acesso das organizações administradas. */
 
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -9,6 +9,7 @@ import { Botao } from '@/components/Botao';
 import { Carregando } from '@/components/Carregando';
 import { Cartao } from '@/components/Cartao';
 import { EstadoVazio } from '@/components/EstadoVazio';
+import { Etiqueta } from '@/components/Etiqueta';
 import { FaixaAviso } from '@/components/FaixaAviso';
 import { ItemMenu } from '@/components/ItemMenu';
 import { TelaComCabecalho } from '@/components/TelaComCabecalho';
@@ -88,15 +89,24 @@ export default function TelaMembrosOrganizacao() {
       return;
     }
 
-    definirSelecionada({
-      ...selecionada,
-      membros: selecionada.membros?.map((membro) =>
-        membro.usuario_id._id === usuarioId ? { ...membro, status } : membro,
-      ),
-    });
+    definirSelecionada((atual) =>
+      atual?._id === selecionada._id
+        ? {
+            ...atual,
+            membros: atual.membros?.map((membro) =>
+              membro.usuario_id._id === usuarioId ? { ...membro, status } : membro,
+            ),
+          }
+        : atual,
+    );
   }
 
   const pendentes = selecionada?.membros?.filter((membro) => membro.status === 'PENDENTE') ?? [];
+  const aprovados = (selecionada?.membros?.filter((membro) => membro.status === 'APROVADO') ?? [])
+    .sort((a, b) =>
+      Number(b.papel === 'ADMIN') - Number(a.papel === 'ADMIN') ||
+      a.usuario_id.nome.localeCompare(b.usuario_id.nome, 'pt-BR'),
+    );
 
   return (
     <TelaComCabecalho
@@ -117,19 +127,25 @@ export default function TelaMembrosOrganizacao() {
         ) : (
           <>
             <Text style={[styles.introducao, { color: cores.textoSuave }]}>
-              Escolha a organização para analisar as solicitações de acesso.
+              Escolha a organização para consultar membros e analisar solicitações de acesso.
             </Text>
             {administradas.map((org) => (
               <ItemMenu
                 key={org._id}
                 titulo={org.nome}
-                descricao="Ver solicitações de acesso"
+                descricao="Ver membros e solicitações de acesso"
                 icone="people-outline"
                 aoTocar={() => abrir(org)}
               />
             ))}
           </>
         )
+      ) : null}
+
+      {selecionada && !carregando ? (
+        <Text style={[styles.secao, { color: cores.texto }]} accessibilityRole="header">
+          Solicitações pendentes ({pendentes.length})
+        </Text>
       ) : null}
 
       {selecionada && !carregando ? (
@@ -159,6 +175,10 @@ export default function TelaMembrosOrganizacao() {
                     <Text style={[styles.email, { color: cores.textoSuave }]}>
                       {membro.usuario_id.email}
                     </Text>
+                    <View style={styles.etiquetas}>
+                      <Etiqueta texto={membro.papel === 'ADMIN' ? 'Administrador' : 'Membro'} />
+                      <Etiqueta texto="Pendente" tom="alerta" />
+                    </View>
                   </View>
                 </View>
 
@@ -185,12 +205,43 @@ export default function TelaMembrosOrganizacao() {
             );
           })
         : null}
+
+      {selecionada && !carregando ? (
+        <>
+          <Text style={[styles.secao, { color: cores.texto }]} accessibilityRole="header">
+            Membros aprovados ({aprovados.length})
+          </Text>
+          {aprovados.length === 0 ? (
+            <EstadoVazio icone="people-outline" mensagem="Não há membros aprovados." />
+          ) : null}
+          {aprovados.map((membro) => (
+            <Cartao key={membro.usuario_id._id} style={styles.cartao}>
+              <View style={styles.pessoa}>
+                <Avatar nome={membro.usuario_id.nome} />
+                <View style={styles.dados}>
+                  <Text style={[styles.nome, { color: cores.texto }]}>{membro.usuario_id.nome}</Text>
+                  <Text style={[styles.email, { color: cores.textoSuave }]}>{membro.usuario_id.email}</Text>
+                  <View style={styles.etiquetas}>
+                    <Etiqueta
+                      texto={membro.papel === 'ADMIN' ? 'Administrador' : 'Membro'}
+                      tom={membro.papel === 'ADMIN' ? 'primaria' : 'neutro'}
+                    />
+                    <Etiqueta texto="Aprovado" tom="sucesso" />
+                  </View>
+                </View>
+              </View>
+            </Cartao>
+          ))}
+        </>
+      ) : null}
     </TelaComCabecalho>
   );
 }
 
 const styles = StyleSheet.create({
   introducao: { ...TIPOGRAFIA.corpoPequeno },
+  secao: { ...TIPOGRAFIA.subtitulo, marginTop: ESPACO.sm },
+  etiquetas: { flexDirection: 'row', flexWrap: 'wrap', gap: ESPACO.xs, marginTop: ESPACO.xs },
   cartao: { gap: ESPACO.md },
   pessoa: { flexDirection: 'row', alignItems: 'center', gap: ESPACO.md - 4 },
   dados: { flex: 1 },
