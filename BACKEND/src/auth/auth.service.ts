@@ -33,11 +33,15 @@ export class AuthService {
   ) {}
 
   async login(loginDto: LoginDto) {
+    if (typeof loginDto.senha !== 'string' || !loginDto.senha) {
+      throw new UnauthorizedException('Email ou senha inválidos');
+    }
+
     const email = loginDto.email.toLowerCase().trim();
 
     const usuario = await this.usuarioModel
       .findOne({ email })
-      .select('+senha_hash')
+      .select('+senha_hash +senhaHash')
       .exec();
 
     if (!usuario) {
@@ -48,7 +52,13 @@ export class AuthService {
       throw new UnauthorizedException('Usuário desativado');
     }
 
-    const senhaValida = await bcrypt.compare(loginDto.senha, usuario.senha_hash);
+    // O campo atual tem precedência, inclusive após redefinir a senha.
+    const hash = usuario.senha_hash ?? usuario.senhaHash;
+    if (typeof hash !== 'string' || !hash) {
+      throw new UnauthorizedException('Email ou senha inválidos');
+    }
+
+    const senhaValida = await bcrypt.compare(loginDto.senha, hash);
 
     if (!senhaValida) {
       throw new UnauthorizedException('Email ou senha inválidos');

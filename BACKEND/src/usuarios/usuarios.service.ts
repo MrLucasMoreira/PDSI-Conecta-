@@ -189,19 +189,23 @@ export class UsuariosService implements OnApplicationBootstrap {
   async alterarSenha(id: string, alterarSenhaDto: AlterarSenhaDto) {
     this.validarId(id);
 
-    const usuario = await this.usuarioModel.findById(id).select('+senha_hash').exec();
+    const usuario = await this.usuarioModel.findById(id).select('+senha_hash +senhaHash').exec();
 
     if (!usuario) {
       throw new NotFoundException('Usuário não encontrado');
     }
 
-    const senhaAtualValida = await bcrypt.compare(alterarSenhaDto.senha_atual, usuario.senha_hash);
+    const hash = usuario.senha_hash ?? usuario.senhaHash;
+    if (typeof hash !== 'string' || !hash) {
+      throw new BadRequestException('Use a recuperação de conta para definir sua senha');
+    }
+    const senhaAtualValida = await bcrypt.compare(alterarSenhaDto.senha_atual, hash);
 
     if (!senhaAtualValida) {
       throw new BadRequestException('A senha atual está incorreta');
     }
 
-    const senhaRepetida = await bcrypt.compare(alterarSenhaDto.nova_senha, usuario.senha_hash);
+    const senhaRepetida = await bcrypt.compare(alterarSenhaDto.nova_senha, hash);
 
     if (senhaRepetida) {
       throw new BadRequestException('A nova senha deve ser diferente da senha atual');
