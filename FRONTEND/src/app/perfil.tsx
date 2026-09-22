@@ -17,7 +17,8 @@ import { Opcao } from '@/components/Opcao';
 import { TelaComCabecalho } from '@/components/TelaComCabecalho';
 import { ESPACO, TIPOGRAFIA } from '@/constants/theme';
 import { ehPreferenciaTema, useTema, type PreferenciaTema } from '@/contexts/TemaContext';
-import { api, removerToken } from '@/services/api';
+import { api } from '@/services/api';
+import { useSessao } from '@/contexts/SessaoContext';
 import { normalizarEmail, validarEmail, validarNome } from '@/utils/validacao';
 
 type Perfil = { nome: string; email: string; tema?: string };
@@ -34,6 +35,7 @@ const OPCOES_TEMA: {
 
 export default function TelaPerfil() {
   const router = useRouter();
+  const sessao = useSessao();
   const { tema, preferencia, definirPreferencia } = useTema();
   const [nome, definirNome] = useState('');
   const [email, definirEmail] = useState('');
@@ -90,10 +92,7 @@ export default function TelaPerfil() {
   }
 
   async function sair() {
-    await removerToken();
-    // Esvazia a pilha para que o voltar não retorne a telas que exigem login.
-    if (router.canDismiss()) router.dismissAll();
-    router.replace('/login');
+    await sessao.sair();
   }
 
   return (

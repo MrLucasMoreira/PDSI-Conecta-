@@ -6,7 +6,7 @@
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Botao } from '@/components/Botao';
@@ -19,6 +19,7 @@ import { ItemMenu } from '@/components/ItemMenu';
 import { Logo } from '@/components/Logo';
 import { ESPACO, FONTES, RAIO, TIPOGRAFIA } from '@/constants/theme';
 import { useTema } from '@/contexts/TemaContext';
+import { useSessao } from '@/contexts/SessaoContext';
 import { api, type Organizacao } from '@/services/api';
 
 type Atalho = {
@@ -93,11 +94,9 @@ function administra(organizacao: Organizacao) {
 export default function TelaInicio() {
   const router = useRouter();
   const { cores } = useTema().tema;
-  const { nome, organizacao, tipo } = useLocalSearchParams<{
-    nome?: string;
-    organizacao?: string;
-    tipo?: string;
-  }>();
+  const { usuario } = useSessao();
+  const nome = usuario?.nome;
+  const tipo = usuario?.tipo;
   const administradorDoSistema = tipo === 'ADMIN_SISTEMA';
   const [organizacoes, definirOrganizacoes] = useState<Organizacao[]>([]);
   const [solicitacoes, definirSolicitacoes] = useState<Record<string, number>>({});
@@ -173,9 +172,7 @@ export default function TelaInicio() {
           Olá, {nome?.split(' ')[0] ?? 'bem-vindo'}!
         </Text>
         <Text style={[styles.subtitulo, { color: cores.textoSuave }]}>
-          {organizacao
-            ? `Você entrou como membro de ${organizacao}.`
-            : 'O que você deseja fazer hoje?'}
+          O que você deseja fazer hoje?
         </Text>
 
         {administradorDoSistema ? (

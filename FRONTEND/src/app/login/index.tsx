@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Link, useRouter } from 'expo-router';
+import { Link } from 'expo-router';
 
 import { Botao } from '@/components/Botao';
 import { CampoTexto } from '@/components/CampoTexto';
@@ -12,7 +12,8 @@ import { FundoGradiente } from '@/components/FundoGradiente';
 import { Logo } from '@/components/Logo';
 import { ESPACO, FONTES, TIPOGRAFIA } from '@/constants/theme';
 import { ehPreferenciaTema, useTema } from '@/contexts/TemaContext';
-import { api, salvarToken } from '@/services/api';
+import { api } from '@/services/api';
+import { useSessao } from '@/contexts/SessaoContext';
 import { normalizarEmail, validarEmail, validarSenha } from '@/utils/validacao';
 
 type RespostaLogin = {
@@ -22,7 +23,7 @@ type RespostaLogin = {
 };
 
 export default function TelaLogin() {
-  const router = useRouter();
+  const sessao = useSessao();
   const { tema, definirPreferencia } = useTema();
   const campoSenha = useRef<TextInput>(null);
   const [email, definirEmail] = useState('');
@@ -46,29 +47,28 @@ export default function TelaLogin() {
       email: normalizarEmail(email),
       senha,
     });
-    definirCarregando(false);
 
     if (!resultado.ok) {
+      definirCarregando(false);
       definirErro(resultado.erro);
       return;
     }
 
     const { access_token: accessToken, token, usuario } = resultado.dados;
-    await salvarToken(accessToken ?? token ?? '');
+    if (!accessToken && !token) { definirCarregando(false); definirErro('O servidor não retornou uma sessão válida.'); return; }
+    if (!await sessao.entrar(accessToken ?? token!)) {
+      definirCarregando(false);
+      definirErro('Não foi possível verificar sua sessão. Tente novamente.');
+      return;
+    }
     if (ehPreferenciaTema(usuario.tema)) definirPreferencia(usuario.tema);
-    router.replace({
-      pathname: '/inicio',
-      params: {
-        nome: usuario.nome,
-        tipo: usuario.tipo ?? 'USUARIO',
-        organizacao: usuario.organizacao ?? '',
-      },
-    });
   }
 
   return (
     <FundoGradiente>
       <Logo largura={180} />
+      {sessao.aviso ? <FaixaAviso aviso={{ tom: 'informacao', mensagem: sessao.aviso }} /> : null}
+      {sessao.erro ? <FaixaAviso aviso={{ tom: 'erro', mensagem: sessao.erro }} /> : null}
 
       <Cartao style={styles.cartao}>
         <Text style={[styles.titulo, { color: tema.cores.texto }]}>Entrar</Text>

@@ -8,6 +8,11 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 const CHAVE_TOKEN = 'conecta_mais_token';
+const ouvintes = new Set<() => void>();
+export function observarSessaoInvalida(ouvinte: () => void) {
+  ouvintes.add(ouvinte);
+  return () => { ouvintes.delete(ouvinte); };
+}
 
 function obterUrlApi() {
   const configurada = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/$/, '');
@@ -71,6 +76,12 @@ export async function api<T>(
       | null;
 
     if (!resposta.ok) {
+      if (resposta.status === 401 && token && !caminho.startsWith('/auth/')) {
+        if (await obterToken() === token) {
+          await removerToken();
+          ouvintes.forEach((ouvinte) => ouvinte());
+        }
+      }
       const mensagem = Array.isArray(dados?.message) ? dados.message[0] : dados?.message;
       return { ok: false, erro: mensagem ?? 'Não foi possível concluir a operação.' };
     }
