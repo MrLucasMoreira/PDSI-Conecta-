@@ -37,6 +37,6 @@ import { Usuario, UsuarioSchema } from '../usuarios/schemas/usuario.schema.js';
 
   providers: [AuthService, JwtAuthGuard, AdminSistemaGuard],
 
-  exports: [AuthService, JwtModule, JwtAuthGuard, AdminSistemaGuard],
+  exports: [AuthService, JwtModule, JwtAuthGuard, AdminSistemaGuard, MongooseModule],
 })
 export class AuthModule {}
