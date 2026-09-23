@@ -62,6 +62,7 @@ function Navegacao() {
         </Stack.Protected>
         <Stack.Protected guard={usuario?.tipo === 'ADMIN_SISTEMA'}>
           <Stack.Screen name="organizacoes/aprovacao" />
+          <Stack.Screen name="sistema" />
         </Stack.Protected>
         <Stack.Protected guard={usuario?.tipo === 'USUARIO'}>
           <Stack.Screen name="organizacoes/cadastro" />

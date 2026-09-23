@@ -191,6 +191,12 @@ export default function TelaInicio() {
               icone="shield-checkmark-outline"
               aoTocar={() => router.push('/organizacoes/aprovacao')}
             />
+            <ItemMenu
+              titulo="Sistema"
+              descricao="Status, relatórios, reinício de subsistemas e reset."
+              icone="hardware-chip-outline"
+              aoTocar={() => router.push('/sistema')}
+            />
           </View>
         ) : (
           <>
