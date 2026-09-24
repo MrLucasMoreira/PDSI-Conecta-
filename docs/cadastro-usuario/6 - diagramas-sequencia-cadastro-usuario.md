@@ -50,7 +50,7 @@ sequenceDiagram
             Frontend->>Usuario: Exibe erro
         else Email disponível
             API->>API: bcrypt.hash(senha, 10)
-            API->>DB: insertOne({nome, email, senha_hash, tipo: USUARIO, tema: SISTEMA, ativo: true})
+            API->>DB: insertOne(usuario)
             DB-->>API: Usuario criado
             API-->>Frontend: 201 Created {usuario}
             Frontend->>Usuario: Sucesso + redireciona para /login
@@ -136,8 +136,8 @@ sequenceDiagram
         DB-->>API: Usuario
         API->>API: Gera token aleatório (32 bytes hex)
         API->>API: Hash SHA-256 do token
-        API->>DB: updateOne({_id}, {reset_senha_token_hash, reset_senha_expira_em: now+30min})
-        API->>Email: Envia email com link APP_RESET_URL?token=<token>
+        API->>DB: updateOne(token_hash, expiração 30min)
+        API->>Email: Envia email com link de redefinição
         API-->>Frontend: 200 OK {mensagem: "Se existir conta ativa..."}
     end
     Frontend->>Usuario: Exibe mensagem de sucesso
@@ -148,7 +148,7 @@ sequenceDiagram
     Usuario->>Frontend: Preenche e envia
     Frontend->>API: POST /auth/redefinir-senha<br/>{token, nova_senha}
     API->>API: Hash SHA-256 do token recebido
-    API->>DB: findOne({reset_senha_token_hash: hash, reset_senha_expira_em: {$gt: now}, ativo: true})
+    API->>DB: findOne({token_hash, expiração > agora, ativo: true})
     
     alt Token inválido/expirado
         DB-->>API: null
@@ -156,7 +156,7 @@ sequenceDiagram
     else Token válido
         DB-->>API: Usuario
         API->>API: bcrypt.hash(nova_senha, 10)
-        API->>DB: updateOne({_id}, {senha_hash: novoHash, $unset: {reset_senha_token_hash, reset_senha_expira_em}})
+        API->>DB: updateOne(senha_hash, remove token campos)
         API-->>Frontend: 200 OK {mensagem: "Senha redefinida com sucesso"}
         Frontend->>Usuario: Sucesso + redireciona para /login
     end
@@ -205,7 +205,7 @@ sequenceDiagram
         alt Nome duplicado
             API-->>Frontend: 409 Conflict "Já existe uma organização com este nome"
         else Nome disponível
-            API->>DB: insertOne Organizacao<br/>{nome, descricao, status: PENDENTE, criada_por: userId,<br/>membros: [{usuario_id: userId, papel: ADMIN, status: APROVADO, solicitado_em: now, aprovado_em: now}]}
+            API->>DB: insertOne Organizacao<br/>{status: PENDENTE, criador como ADMIN aprovado}
             DB-->>API: Organizacao criada
             API-->>Frontend: 201 Created {organizacao}
             Frontend->>UsuarioComum: Sucesso + redireciona
@@ -233,9 +233,9 @@ sequenceDiagram
     API->>DB: Busca organizações
     
     alt Usuario é ADMIN_SISTEMA
-        API->>DB: find().populate('criada_por').sort({criado_em: -1})
+        API->>DB: find().populate('criada_por').sort(criado_em desc)
     else Usuario Comum
-        API->>DB: find({$or: [{status: APROVADA}, {'membros.usuario_id': userId}]}).select('nome descricao status membros')
+        API->>DB: find(orgs APROVADA OU com vínculo do usuário)
     end
     
     DB-->>API: Lista de organizações
@@ -275,13 +275,14 @@ sequenceDiagram
             alt Usuário não encontrado/inativo
                 API-->>Frontend: 404 NotFound "Usuário não encontrado"
             else Usuário OK
-                API->>API: Verifica se já tem vínculo (membros.some)
+                API->>API: Verifica se já tem vínculo
                 alt Já tem vínculo
                     API-->>Frontend: 409 Conflict "Usuário já pertence ou possui solicitação"
                 else Sem vínculo
-                    API->>DB: updateOne<br/>{_id: orgId, status: APROVADA, 'membros.usuario_id': {$ne: userId}}<br/>$push: {membros: {usuario_id: userId, papel: MEMBRO, status: PENDENTE, solicitado_em: now}}
-                    alt modifiedCount !== 1 (concorrência)
-                        API-->>Frontend: 409 Conflict "Solicitação já registrada ou organização indisponível"
+                    Note over API: updateOne atômico com $push + filtro $ne<br/>evita duplicidade em concorrência
+                    API->>DB: Cria vínculo PENDENTE/MEMBRO
+                    alt Concorrência detectada
+                        API-->>Frontend: 409 Conflict "Solicitação já registrada"
                     else Sucesso
                         DB-->>API: WriteResult
                         API-->>Frontend: 200 OK {mensagem: "Solicitação enviada para análise", membro}
@@ -311,7 +312,7 @@ sequenceDiagram
     Frontend->>API: GET /organizacoes (lista orgs onde é ADMIN aprovado)
     API->>Guards: JwtAuthGuard + UsuarioAtivoGuard
     Guards-->>API: OK
-    API->>DB: find({status: APROVADA, 'membros.usuario_id': userId, 'membros.papel': ADMIN, 'membros.status': APROVADO})
+    API->>DB: find(orgs onde usuário é ADMIN aprovado)
     DB-->>API: Orgs administradas
     Frontend->>AdminOrg: Lista orgs para escolher
     
@@ -336,10 +337,9 @@ sequenceDiagram
     alt Validações falham
         API-->>Frontend: 400/403/409 erro correspondente
     else Validações OK
-        API->>DB: updateOne<br/>{_id: orgId, status: APROVADA,<br/>$and: [{membros: {$elemMatch: {usuario_id: solicitanteId, papel: ADMIN, status: APROVADO}}},<br/>{membros: {$elemMatch: {usuario_id: alvoId, status: PENDENTE}}}]},
-        {$set: {'membros.$[alvo].status': 'APROVADO', 'membros.$[alvo].aprovado_em': now},<br/>arrayFilters: [{'alvo.usuario_id': alvoId, 'alvo.status': 'PENDENTE'}]}
-        
-        alt modifiedCount !== 1
+        Note over API: updateOne atômico com arrayFilters<br/>$set: status=APROVADO, aprovado_em=now<br/>Filtro: alvo.usuario_id + alvo.status=PENDENTE
+        API->>DB: Atualiza vínculo para APROVADO
+        alt Concorrência/permissão alterada (modifiedCount !== 1)
             API-->>Frontend: 409 Conflict "Solicitação ou permissões alteradas. Atualize a lista"
         else Sucesso
             DB-->>API: WriteResult
@@ -375,10 +375,9 @@ sequenceDiagram
     alt Validações falham
         API-->>Frontend: 400/403/409 erro
     else Validações OK
-        API->>DB: updateOne<br/>{_id: orgId, status: APROVADA,<br/>$and: [{membros: {$elemMatch: {usuario_id: solicitanteId, papel: ADMIN, status: APROVADO}}},<br/>{membros: {$elemMatch: {usuario_id: alvoId, status: PENDENTE}}}]},
-        {$set: {'membros.$[alvo].status': 'REJEITADO'},<br/>$unset: {'membros.$[alvo].aprovado_em': ''},<br/>arrayFilters: [{'alvo.usuario_id': alvoId, 'alvo.status': 'PENDENTE'}]}
-        
-        alt modifiedCount !== 1
+        Note over API: updateOne atômico com arrayFilters<br/>$set: status=REJEITADO<br/>$unset: aprovado_em<br/>Filtro: alvo.usuario_id + alvo.status=PENDENTE
+        API->>DB: Atualiza vínculo para REJEITADO
+        alt Concorrência/permissão alterada (modifiedCount !== 1)
             API-->>Frontend: 409 Conflict "Solicitação ou permissões alteradas"
         else Sucesso
             DB-->>API: WriteResult
@@ -418,14 +417,14 @@ sequenceDiagram
     else Membro não é APROVADO
         API-->>Frontend: 409 Conflict "Apenas membros aprovados podem ser removidos"
     else Membro é MEMBRO APROVADO
-        API->>DB: updateOne<br/>{_id: orgId, status: APROVADA,<br/>$and: [{membros: {$elemMatch: {usuario_id: solicitanteId, papel: ADMIN, status: APROVADO}}},<br/>{membros: {$elemMatch: {usuario_id: alvoId, papel: MEMBRO, status: APROVADO}}}]},
-        {$pull: {membros: {usuario_id: alvoId}}}
-        
-        alt modifiedCount !== 1
+        Note over API: updateOne atômico com $pull<br/>Remove vínculo do array membros
+        API->>DB: Remove membro da organização
+        alt Concorrência/permissão alterada (modifiedCount !== 1)
             API-->>Frontend: 409 Conflict "Vínculo ou permissões mudaram"
         else Sucesso remoção da org
             DB-->>API: WriteResult
-            API->>ComissaoDB: updateMany<br/>{organizacao_id: orgId},<br/>{$pull: {membros: {usuario_id: alvoId}}}
+            Note over API: updateMany em comissões<br/>$pull: remove membro das comissões da org
+            API->>ComissaoDB: Remove membro das comissões vinculadas
             ComissaoDB-->>API: WriteResult
             API-->>Frontend: 200 OK {mensagem: "Acesso à organização removido com sucesso"}
             Frontend->>Frontend: Remove card da lista
@@ -452,7 +451,7 @@ sequenceDiagram
     Frontend->>API: GET /usuarios/me + GET /organizacoes
     API->>Guards: JwtAuthGuard + AdminSistemaGuard (para GET /organizacoes como admin)
     Guards-->>API: OK (tipo === ADMIN_SISTEMA)
-    API->>DB: find().populate('criada_por').sort({criado_em: -1})
+    API->>DB: find().populate('criada_por').sort(criado_em desc)
     DB-->>API: Todas orgs (PENDENTE, APROVADA, REVOGADA)
     API-->>Frontend: 200 OK [Organizacao[]]
     Frontend->>AdminSistema: Exibe cards ordenados: Pendentes → Aprovadas → Revogadas
@@ -462,7 +461,7 @@ sequenceDiagram
     Frontend->>API: PATCH /organizacoes/:id<br/>{status: "APROVADA"}
     API->>Guards: JwtAuthGuard + AdminSistemaGuard
     Guards-->>API: OK
-    API->>DB: findByIdAndUpdate(id, {status: APROVADA}, {new: true}).populate(...)
+    API->>DB: findByIdAndUpdate(id, {status: APROVADA})
     DB-->>API: Organizacao atualizada
     API-->>Frontend: 200 OK {organizacao}
     Frontend->>Frontend: Atualiza etiqueta para "Aprovada" (verde), mostra botão "Revogar"
@@ -472,7 +471,7 @@ sequenceDiagram
     Frontend->>API: PATCH /organizacoes/:id<br/>{status: "REVOGADA"}
     API->>Guards: JwtAuthGuard + AdminSistemaGuard
     Guards-->>API: OK
-    API->>DB: findByIdAndUpdate(id, {status: REVOGADA}, {new: true}).populate(...)
+    API->>DB: findByIdAndUpdate(id, {status: REVOGADA})
     DB-->>API: Organizacao atualizada
     API-->>Frontend: 200 OK {organizacao}
     Frontend->>Frontend: Atualiza etiqueta para "Revogada" (vermelho), mostra botão "Excluir"
