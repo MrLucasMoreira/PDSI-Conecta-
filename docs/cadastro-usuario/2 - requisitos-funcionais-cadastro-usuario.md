@@ -2,378 +2,153 @@
 
 ---
 
-## Sumário de Casos de Uso
-
-| Código | Caso de Uso | Ator Principal |
-|--------|-------------|----------------|
-| RF-01 | Cadastrar-se na plataforma | Usuário Não Autenticado |
-| RF-02 | Fazer login | Usuário Não Autenticado / Usuário Comum |
-| RF-03 | Recuperar senha | Usuário Não Autenticado |
-| RF-04 | Visualizar organizações aprovadas | Usuário Comum |
-| RF-05 | Solicitar acesso a organização | Usuário Comum |
-| RF-06 | Acompanhar status da solicitação | Usuário Comum |
-| RF-07 | Visualizar solicitações pendentes | Admin da Organização |
-| RF-08 | Aprovar solicitação de acesso | Admin da Organização |
-| RF-09 | Rejeitar solicitação de acesso | Admin da Organização |
-| RF-10 | Visualizar membros aprovados | Admin da Organização |
-| RF-11 | Remover membro da organização | Admin da Organização |
-| RF-12 | Criar organização | Admin do Sistema |
-| RF-13 | Listar todas as organizações | Admin do Sistema |
-| RF-14 | Aprovar organização | Admin do Sistema |
-| RF-15 | Revogar organização | Admin do Sistema |
-| RF-16 | Excluir organização | Admin do Sistema |
-
----
-
-## Formulário Padrão de Requisito Funcional
-
----
-
-### RF-01: Cadastrar-se na plataforma
+## RF-01 - Cadastrar-se na plataforma
 
 | Campo | Descrição |
-|-------|-----------|
-| **Código** | RF-01 |
-| **Nome** | Cadastrar-se na plataforma |
+|---|---|
+| **Nome do Caso de Uso** | Cadastrar-se na plataforma |
+| **ID do Requisito (RF)** | RF-01 |
 | **Ator Principal** | Usuário Não Autenticado |
-| **Atores Secundários** | Sistema |
-| **Descrição** | Permite que um novo usuário crie uma conta na plataforma informando dados pessoais e credenciais de acesso. |
-| **Pré-condições** | - Usuário não possui conta na plataforma<br>- Email informado não está cadastrado |
-| **Pós-condições** | - Conta de usuário criada com tipo `USUARIO`<br>- Usuário redirecionado para tela de login<br>- Senha armazenada com hash bcrypt |
-| **Fluxo Principal** | 1. Usuário acessa a tela de cadastro<br>2. Sistema exibe formulário com campos: nome, email, senha, confirmar senha<br>3. Usuário preenche os dados e submete<br>4. Sistema valida: nome obrigatório, email único e formato válido, senha com mínimo 8 caracteres, confirmação igual à senha<br>5. Sistema cria usuário com `tipo: USUARIO`, `ativo: true`, `tema: SISTEMA`<br>6. Sistema retorna sucesso e redireciona para login |
-| **Fluxos Alternativos** | **FA-01: Email já cadastrado**<br>1. Sistema detecta email duplicado<br>2. Sistema retorna erro "Já existe um usuário com este email"<br>3. Usuário corrige e reenvia<br><br>**FA-02: Dados inválidos**<br>1. Sistema valida campos e encontra erros<br>2. Sistema exibe mensagens de erro por campo<br>3. Usuário corrige e reenvia |
-| **Regras de Negócio** | - RN-01: Email deve ser único no sistema (case-insensitive)<br>- RN-02: Senha deve ter no mínimo 8 caracteres<br>- RN-03: Usuário criado por padrão com tipo `USUARIO` (não admin)<br>- RN-04: Senha armazenada com hash bcrypt (cost 10) |
-| **Requisitos Não Funcionais** | - RNF-01: Resposta em < 2s<br>- RNF-02: Comunicação via HTTPS<br>- RNF-03: Validação client-side e server-side |
+| **Objetivo** | Permitir que um novo usuário crie uma conta na plataforma Conecta+ informando seus dados pessoais e credenciais de acesso. |
 | **Prioridade** | Alta |
-| **Rastreabilidade** | UC1 - Caso de uso "Cadastrar-se na plataforma" |
+| **Pré-Condições** | O usuário não deve estar autenticado e o e-mail informado não deve estar cadastrado na plataforma. |
+| **Pós-Condições** | A conta do usuário é criada com sucesso e fica disponível para autenticação na plataforma. |
+| **Fluxo Principal (Caminho de Sucesso)** | 1. O usuário acessa a tela de cadastro.<br>2. O sistema exibe os campos nome, e-mail, senha e confirmação de senha.<br>3. O usuário preenche os campos solicitados.<br>4. O usuário confirma o cadastro.<br>5. O sistema valida os dados informados.<br>6. O sistema cria a conta do usuário.<br>7. O sistema informa que o cadastro foi realizado com sucesso.<br>8. O usuário é direcionado para a tela de login. |
+| **Fluxos Alternativos** | Não se aplica. |
+| **Fluxos de Exceção** | **FE-01: E-mail já cadastrado**<br>1. O sistema identifica que o e-mail já pertence a outro usuário.<br>2. O sistema informa que já existe uma conta cadastrada com o e-mail.<br>3. O cadastro não é realizado.<br><br>**FE-02: Dados inválidos**<br>1. O sistema identifica campos inválidos ou não preenchidos corretamente.<br>2. O sistema informa os campos que devem ser corrigidos.<br>3. O usuário pode corrigir os dados e tentar novamente. |
 
 ---
 
-### RF-02: Fazer login
+## RF-02 - Visualizar organizações disponíveis
 
 | Campo | Descrição |
-|-------|-----------|
-| **Código** | RF-02 |
-| **Nome** | Fazer login |
-| **Ator Principal** | Usuário Não Autenticado / Usuário Comum |
-| **Atores Secundários** | Sistema |
-| **Descrição** | Autentica usuário na plataforma e retorna token JWT para sessão. |
-| **Pré-condições** | - Usuário possui conta ativa (`ativo: true`)<br>- Credenciais corretas |
-| **Pós-condições** | - Token JWT gerado com claims: `sub` (userId), `email`, `tipo`<br>- Token armazenado no cliente (SecureStore/localStorage)<br>- Usuário redirecionado para tela inicial |
-| **Fluxo Principal** | 1. Usuário acessa tela de login<br>2. Sistema exibe campos: email, senha<br>3. Usuário informa credenciais e submete<br>4. Sistema busca usuário por email<br>5. Sistema verifica se conta está ativa<br>6. Sistema compara hash da senha com bcrypt<br>7. Sistema gera JWT assinado<br>8. Sistema retorna token + dados do usuário (nome, email, tipo, tema)<br>9. Cliente armazena token e redireciona para `/inicio` |
-| **Fluxos Alternativos** | **FA-01: Credenciais inválidas**<br>1. Email não encontrado ou senha incorreta<br>2. Sistema retorna erro genérico "Email ou senha inválidos"<br>3. Usuário tenta novamente<br><br>**FA-02: Conta desativada**<br>1. Usuário encontrado mas `ativo: false`<br>2. Sistema retorna erro "Usuário desativado"<br><br>**FA-03: Senha não definida (conta legada)**<br>1. Sistema detecta `senha_hash` nulo<br>2. Sistema retorna erro orientando para recuperação de conta |
-| **Regras de Negócio** | - RN-05: Token JWT expira conforme configuração (ex: 24h)<br>- RN-06: Token inclui `tipo` atualizado do banco (permite mudança de role sem relogin)<br>- RN-07: Email normalizado para lowercase no login |
-| **Requisitos Não Funcionais** | - RNF-04: Rate limiting para evitar brute force<br>- RNF-05: Senha nunca logada<br>- RNF-06: Token assinado com RS256 ou HS256 seguro |
-| **Prioridade** | Alta |
-| **Rastreabilidade** | UC2 - Caso de uso "Fazer login" |
-
----
-
-### RF-03: Recuperar senha
-
-| Campo | Descrição |
-|-------|-----------|
-| **Código** | RF-03 |
-| **Nome** | Recuperar senha |
-| **Ator Principal** | Usuário Não Autenticado |
-| **Atores Secundários** | Sistema, Servidor de Email |
-| **Descrição** | Permite que usuário solicite redefinição de senha via email com link temporário. |
-| **Pré-condições** | - Usuário possui conta ativa com o email informado |
-| **Pós-condições** | - Token de recuperação gerado (hash SHA-256 armazenado)<br>- Link de redefinição enviado por email<br>- Token expira em 30 minutos |
-| **Fluxo Principal** | 1. Usuário acessa "Esqueci minha senha"<br>2. Sistema solicita email<br>3. Usuário informa email e submete<br>4. Sistema busca usuário ativo por email<br>5. Sistema gera token aleatório (32 bytes hex)<br>6. Sistema armazena `reset_senha_token_hash` (SHA-256) e `reset_senha_expira_em` (30 min)<br>7. Sistema envia email com link: `APP_RESET_URL?token=<token>`<br>8. Sistema retorna mensagem genérica de sucesso (mesmo se email não existir) |
-| **Fluxos Alternativos** | **FA-01: Email não cadastrado**<br>1. Sistema não encontra usuário<br>2. Sistema retorna mesma mensagem de sucesso (prevenção de enumeração)<br><br>**FA-02: SMTP não configurado (dev)**<br>1. Sistema loga link no console para testes |
-| **Regras de Negócio** | - RN-08: Token de uso único (invalidado após uso)<br>- RN-09: Token expira em 30 minutos<br>- RN-10: Mensagem genérica evita enumeração de emails<br>- RN-11: Nova senha deve ser diferente da atual |
-| **Requisitos Não Funcionais** | - RNF-07: Email enviado em < 5s<br>- RNF-08: Link HTTPS em produção |
-| **Prioridade** | Média |
-| **Rastreabilidade** | UC3 - Caso de uso "Recuperar senha" |
-
----
-
-### RF-04: Visualizar organizações aprovadas
-
-| Campo | Descrição |
-|-------|-----------|
-| **Código** | RF-04 |
-| **Nome** | Visualizar organizações aprovadas |
+|---|---|
+| **Nome do Caso de Uso** | Visualizar organizações disponíveis |
+| **ID do Requisito (RF)** | RF-02 |
 | **Ator Principal** | Usuário Comum |
-| **Atores Secundários** | Sistema |
-| **Descrição** | Lista organizações com status `APROVADA` onde o usuário pode solicitar acesso, além das que já possui vínculo (pendente/rejeitado). |
-| **Pré-condições** | - Usuário autenticado (JWT válido)<br>- Usuário com `ativo: true` |
-| **Pós-condições** | - Lista de organizações retornada com status do vínculo do usuário |
-| **Fluxo Principal** | 1. Usuário acessa tela "Participar de organização"<br>2. Sistema faz `GET /organizacoes` com token<br>3. Backend filtra: `status = APROVADA` OU usuário tem vínculo na org<br>4. Sistema retorna: `_id`, `nome`, `descricao`, `status`, `meu_vinculo` (papel, status)<br>5. Frontend separa em abas: Disponíveis, Pendentes, Recusadas |
-| **Fluxos Alternativos** | **FA-01: Nenhuma organização**<br>1. Lista vazia<br>2. Frontend exibe estado vazio por aba |
-| **Regras de Negócio** | - RN-12: Admin do sistema vê todas as orgs (qualquer status)<br>- RN-13: Usuário comum vê apenas APROVADAS + suas solicitações<br>- RN-14: Org PENDENTE/REVOGADA sem vínculo não aparece |
-| **Requisitos Não Funcionais** | - RNF-09: Paginação se > 50 orgs (futuro) |
+| **Objetivo** | Permitir que o usuário consulte as organizações aprovadas disponíveis para solicitação de acesso. |
 | **Prioridade** | Alta |
-| **Rastreabilidade** | UC4 - Caso de uso "Visualizar organizações aprovadas" |
+| **Pré-Condições** | O usuário deve estar autenticado e com a conta ativa na plataforma. |
+| **Pós-Condições** | As organizações disponíveis para solicitação de acesso são apresentadas ao usuário. |
+| **Fluxo Principal (Caminho de Sucesso)** | 1. O usuário acessa a opção de participar de uma organização.<br>2. O sistema consulta as organizações disponíveis.<br>3. O sistema identifica as organizações aprovadas nas quais o usuário ainda não possui vínculo.<br>4. O sistema apresenta ao usuário a lista de organizações disponíveis.<br>5. Para cada organização, são exibidos seu nome e sua descrição, quando disponível. |
+| **Fluxos Alternativos** | **FA-01: Nenhuma organização disponível**<br>1. O sistema não encontra organizações disponíveis para o usuário.<br>2. O sistema apresenta uma mensagem informando que não existem novas organizações disponíveis para participação. |
+| **Fluxos de Exceção** | **FE-01: Falha ao consultar organizações**<br>1. O sistema não consegue carregar as organizações.<br>2. O sistema informa ao usuário que não foi possível concluir a consulta. |
 
 ---
 
-### RF-05: Solicitar acesso a organização
+## RF-03 - Solicitar acesso à organização
 
 | Campo | Descrição |
-|-------|-----------|
-| **Código** | RF-05 |
-| **Nome** | Solicitar acesso a organização |
+|---|---|
+| **Nome do Caso de Uso** | Solicitar acesso à organização |
+| **ID do Requisito (RF)** | RF-03 |
 | **Ator Principal** | Usuário Comum |
-| **Atores Secundários** | Sistema, Admin da Organização (notificado indiretamente) |
-| **Descrição** | Usuário solicita ingresso em uma organização aprovada; cria vínculo `PENDENTE` com papel `MEMBRO`. |
-| **Pré-condições** | - Usuário autenticado e ativo<br>- Organização existe e `status: APROVADA`<br>- Usuário não possui vínculo (nenhum status) nessa organização |
-| **Pós-condições** | - Vínculo criado: `papel: MEMBRO`, `status: PENDENTE`, `solicitado_em: now`<br>- Solicitação aparece para admins da org na aba "Pendentes" |
-| **Fluxo Principal** | 1. Usuário visualiza organizações disponíveis (aba "Disponíveis")<br>2. Usuário clica "Pedir para participar"<br>3. Sistema faz `POST /organizacoes/:id/membros` com userId do token<br>4. Backend valida: org existe, status APROVADA, usuário ativo, sem vínculo prévio<br>5. Backend cria vínculo com `$push` atomic (evita duplicidade concorrente)<br>6. Sistema retorna sucesso + vínculo criado<br>7. Frontend move org para aba "Pendentes" com etiqueta "Solicitação pendente" |
-| **Fluxos Alternativos** | **FA-01: Organização não aprovada**<br>1. Backend retorna 403 "Organização não está aprovada"<br><br>**FA-02: Usuário já tem vínculo**<br>1. Backend retorna 409 "Usuário já pertence ou possui solicitação"<br><br>**FA-03: Organização não encontrada**<br>1. Backend retorna 404 |
-| **Regras de Negócio** | - RN-15: Apenas orgs `APROVADA` aceitam solicitações<br>- RN-16: Um usuário só pode ter um vínculo por organização<br>- RN-17: Novo vínculo sempre inicia como `MEMBRO` + `PENDENTE`<br>- RN-18: Concorrência tratada com `updateOne` + filtro `$ne` |
-| **Requisitos Não Funcionais** | - RNF-10: Feedback visual imediato no frontend |
+| **Objetivo** | Permitir que um usuário solicite participação em uma organização aprovada. |
 | **Prioridade** | Alta |
-| **Rastreabilidade** | UC5 - Caso de uso "Solicitar acesso a organização" |
+| **Pré-Condições** | O usuário deve estar autenticado e ativo.<br>A organização deve estar aprovada.<br>O usuário não deve possuir vínculo anterior com a organização. |
+| **Pós-Condições** | Uma solicitação de acesso é registrada com status pendente e fica disponível para análise pelo administrador da organização. |
+| **Fluxo Principal (Caminho de Sucesso)** | 1. O usuário visualiza as organizações disponíveis.<br>2. O usuário seleciona a opção "Pedir para participar" em uma organização.<br>3. O sistema verifica se a organização está disponível para receber solicitações.<br>4. O sistema verifica se o usuário ainda não possui vínculo com a organização.<br>5. O sistema registra a solicitação com status pendente.<br>6. O sistema informa que a solicitação foi enviada com sucesso.<br>7. A organização passa a ser apresentada ao usuário entre suas solicitações pendentes. |
+| **Fluxos Alternativos** | Não se aplica. |
+| **Fluxos de Exceção** | **FE-01: Organização indisponível**<br>1. A organização não existe ou deixou de estar aprovada.<br>2. O sistema não registra a solicitação e informa que a organização não está disponível.<br><br>**FE-02: Vínculo já existente**<br>1. O sistema identifica que o usuário já possui vínculo ou solicitação registrada para a organização.<br>2. Uma nova solicitação não é criada.<br>3. O sistema informa que o usuário já pertence ou possui solicitação para aquela organização. |
 
 ---
 
-### RF-06: Acompanhar status da solicitação
+## RF-04 - Acompanhar status da solicitação
 
 | Campo | Descrição |
-|-------|-----------|
-| **Código** | RF-06 |
-| **Nome** | Acompanhar status da solicitação |
+|---|---|
+| **Nome do Caso de Uso** | Acompanhar status da solicitação |
+| **ID do Requisito (RF)** | RF-04 |
 | **Ator Principal** | Usuário Comum |
-| **Atores Secundários** | Sistema |
-| **Descrição** | Usuário visualiza o status de suas solicitações de acesso (pendente, aprovado, rejeitado) por organização. |
-| **Pré-condições** | - Usuário autenticado<br>- Usuário possui ao menos um vínculo com status `PENDENTE` ou `REJEITADO` |
-| **Pós-condições** | - Status atualizado exibido na interface |
-| **Fluxo Principal** | 1. Usuário acessa tela "Participar de organização"<br>2. Sistema carrega organizações (RF-04)<br>3. Usuário alterna para aba "Pendentes" ou "Recusadas"<br>4. Frontend filtra por `meu_vinculo.status`<br>5. Exibe etiqueta: "Solicitação pendente" (alerta) ou "Solicitação recusada" (erro) |
-| **Fluxos Alternativos** | **FA-01: Solicitação aprovada**<br>1. Org não aparece mais nas abas Pendentes/Recusadas<br>2. Usuário passa a ter acesso às funcionalidades da org |
-| **Regras de Negócio** | - RN-19: Status `PENDENTE` → pode ser aprovado/rejeitado por admin<br>- RN-20: Status `REJEITADO` → usuário pode solicitar novamente (novo vínculo)<br>- RN-21: Status `APROVADO` → org some das abas de solicitação |
+| **Objetivo** | Permitir que o usuário acompanhe a situação de suas solicitações de acesso às organizações. |
 | **Prioridade** | Alta |
-| **Rastreabilidade** | UC6 - Caso de uso "Acompanhar status da solicitação" |
+| **Pré-Condições** | O usuário deve estar autenticado e possuir pelo menos uma solicitação ou vínculo registrado com uma organização. |
+| **Pós-Condições** | O usuário visualiza a situação atual de suas solicitações de acesso. |
+| **Fluxo Principal (Caminho de Sucesso)** | 1. O usuário acessa a tela de participação em organizações.<br>2. O sistema consulta os vínculos do usuário com as organizações.<br>3. O sistema separa as solicitações de acordo com sua situação.<br>4. O usuário acessa a opção de solicitações pendentes ou recusadas.<br>5. O sistema apresenta as organizações correspondentes ao status selecionado. |
+| **Fluxos Alternativos** | **FA-01: Solicitação aprovada**<br>1. O administrador aprova a solicitação do usuário.<br>2. A organização deixa de aparecer entre as solicitações pendentes ou recusadas.<br>3. O vínculo do usuário com a organização passa a estar aprovado e o acesso correspondente é liberado. |
+| **Fluxos de Exceção** | **FE-01: Falha ao consultar solicitações**<br>1. O sistema não consegue obter as informações das organizações e vínculos.<br>2. O sistema informa que não foi possível carregar as solicitações. |
 
 ---
 
-### RF-07: Visualizar solicitações pendentes
+## RF-05 - Visualizar solicitações pendentes
 
 | Campo | Descrição |
-|-------|-----------|
-| **Código** | RF-07 |
-| **Nome** | Visualizar solicitações pendentes |
+|---|---|
+| **Nome do Caso de Uso** | Visualizar solicitações pendentes |
+| **ID do Requisito (RF)** | RF-05 |
 | **Ator Principal** | Admin da Organização |
-| **Atores Secundários** | Sistema |
-| **Descrição** | Admin da organização visualiza lista de usuários com solicitação de acesso pendente de análise. |
-| **Pré-condições** | - Usuário autenticado<br>- Usuário é `ADMIN` com `status: APROVADO` na organização<br>- Organização `status: APROVADA` |
-| **Pós-condições** | - Lista de membros pendentes exibida com dados: nome, email, papel, data da solicitação |
-| **Fluxo Principal** | 1. Admin acessa tela "Membros da organização" (rota `/organizacoes/membros?organizacao_id=...`)<br>2. Sistema lista organizações onde usuário é ADMIN aprovado<br>3. Admin seleciona uma organização<br>4. Sistema faz `GET /organizacoes/:id` com populate de membros<br>5. Backend valida: solicitante é ADMIN aprovado na org (`exigirAdministrador`)<br>6. Frontend filtra `membros.status === PENDENTE`<br>7. Exibe cards com: avatar, nome, email, papel (MEMBRO), etiqueta "Pendente", botões Aprovar/Rejeitar |
-| **Fluxos Alternativos** | **FA-01: Admin não tem orgs administradas**<br>1. Frontend exibe estado vazio "Você ainda não administra uma organização aprovada"<br><br>**FA-02: Nenhuma solicitação pendente**<br>1. Frontend exibe "Não há solicitações pendentes" |
-| **Regras de Negócio** | - RN-22: Apenas ADMIN com status APROVADO na org pode visualizar<br>- RN-23: Org deve estar APROVADA<br>- RN-24: Mostra data da solicitação (`solicitado_em`) |
+| **Objetivo** | Permitir que o administrador visualize os usuários que solicitaram acesso à organização e aguardam análise. |
 | **Prioridade** | Alta |
-| **Rastreabilidade** | UC7 - Caso de uso "Visualizar solicitações pendentes" |
+| **Pré-Condições** | O administrador deve estar autenticado.<br>O administrador deve possuir vínculo aprovado com papel de administrador na organização.<br>A organização deve estar aprovada. |
+| **Pós-Condições** | A lista de solicitações pendentes da organização é apresentada ao administrador. |
+| **Fluxo Principal (Caminho de Sucesso)** | 1. O administrador acessa a opção de membros da organização.<br>2. O sistema apresenta as organizações aprovadas administradas pelo usuário.<br>3. O administrador seleciona uma organização.<br>4. O sistema consulta os membros e solicitações da organização.<br>5. O sistema identifica os usuários com solicitação pendente.<br>6. O sistema apresenta os usuários que aguardam análise.<br>7. Para cada solicitação são disponibilizadas as opções de aprovar ou rejeitar. |
+| **Fluxos Alternativos** | **FA-01: Nenhuma solicitação pendente**<br>1. Não existem solicitações aguardando análise.<br>2. O sistema informa que não há solicitações pendentes.<br><br>**FA-02: Nenhuma organização administrada**<br>1. O usuário não administra nenhuma organização aprovada.<br>2. O sistema apresenta uma mensagem informativa. |
+| **Fluxos de Exceção** | **FE-01: Acesso não autorizado**<br>1. O usuário não possui permissão de administrador na organização selecionada.<br>2. O sistema bloqueia o acesso às informações de membros e solicitações. |
 
 ---
 
-### RF-08: Aprovar solicitação de acesso
+## RF-06 - Aprovar solicitação de acesso
 
 | Campo | Descrição |
-|-------|-----------|
-| **Código** | RF-08 |
-| **Nome** | Aprovar solicitação de acesso |
+|---|---|
+| **Nome do Caso de Uso** | Aprovar solicitação de acesso |
+| **ID do Requisito (RF)** | RF-06 |
 | **Ator Principal** | Admin da Organização |
-| **Atores Secundários** | Sistema, Usuário Solicitante |
-| **Descrição** | Admin aprova solicitação de acesso, alterando status do vínculo para `APROVADO` e registrando data de aprovação. |
-| **Pré-condições** | - Admin autenticado, ADMIN aprovado na org<br>- Organização APROVADA<br>- Solicitação existe com status `PENDENTE` |
-| **Pós-condições** | - Vínculo atualizado: `status: APROVADO`, `aprovado_em: now`<br>- Usuário ganha acesso às comissões e recursos da organização |
-| **Fluxo Principal** | 1. Admin visualiza solicitações pendentes (RF-07)<br>2. Admin clica "Aprovar" no card do usuário<br>3. Sistema faz `PATCH /organizacoes/:id/membros/:usuarioId` com `{ status: "APROVADO" }`<br>4. Backend valida: solicitante é ADMIN aprovado, org APROVADA, alvo está PENDENTE<br>5. Backend faz `updateOne` com `arrayFilters` atômico:<br>   - `$set: { 'membros.$[alvo].status': 'APROVADO', 'membros.$[alvo].aprovado_em': now }`<br>6. Sistema retorna sucesso<br>7. Frontend atualiza: move usuário para seção "Membros aprovados", etiqueta "Aprovado" (sucesso) |
-| **Fluxos Alternativos** | **FA-01: Solicitação já processada**<br>1. Backend retorna 409 "A solicitação ou as permissões foram alteradas"<br>2. Frontend recarrega lista<br><br>**FA-02: Admin perde permissão durante operação**<br>1. Validação `arrayFilters` falha (modifiedCount !== 1)<br>2. Mesmo erro 409 |
-| **Regras de Negócio** | - RN-25: Apenas ADMIN da mesma organização pode aprovar<br>- RN-26: Apenas solicitações `PENDENTE` podem ser aprovadas<br>- RN-27: Operação atômica previne race conditions<br>- RN-28: Campo `aprovado_em` preenchido apenas na aprovação |
+| **Objetivo** | Permitir que o administrador autorize o ingresso de um usuário na organização. |
 | **Prioridade** | Alta |
-| **Rastreabilidade** | UC8 - Caso de uso "Aprovar solicitação de acesso" |
+| **Pré-Condições** | O administrador deve estar autenticado e possuir permissão de administração na organização.<br>A organização deve estar aprovada.<br>A solicitação do usuário deve estar com status pendente. |
+| **Pós-Condições** | A solicitação passa para o status aprovado e o usuário passa a possuir acesso à organização. |
+| **Fluxo Principal (Caminho de Sucesso)** | 1. O administrador visualiza as solicitações pendentes da organização.<br>2. O administrador seleciona a opção de aprovar uma solicitação.<br>3. O sistema verifica se a solicitação ainda está pendente.<br>4. O sistema verifica as permissões do administrador.<br>5. O sistema altera o status da solicitação para aprovado.<br>6. O sistema registra a aprovação.<br>7. O usuário passa a constar entre os membros aprovados da organização.<br>8. O sistema apresenta uma confirmação da operação ao administrador. |
+| **Fluxos Alternativos** | Não se aplica. |
+| **Fluxos de Exceção** | **FE-01: Solicitação já analisada**<br>1. O sistema identifica que a solicitação não está mais pendente.<br>2. A aprovação não é realizada.<br>3. O sistema solicita a atualização da lista.<br><br>**FE-02: Administrador sem permissão**<br>1. O sistema identifica que o usuário não possui mais permissão para administrar a organização.<br>2. A aprovação é cancelada e o acesso é negado. |
 
 ---
 
-### RF-09: Rejeitar solicitação de acesso
+## RF-07 - Rejeitar solicitação de acesso
 
 | Campo | Descrição |
-|-------|-----------|
-| **Código** | RF-09 |
-| **Nome** | Rejeitar solicitação de acesso |
+|---|---|
+| **Nome do Caso de Uso** | Rejeitar solicitação de acesso |
+| **ID do Requisito (RF)** | RF-07 |
 | **Ator Principal** | Admin da Organização |
-| **Atores Secundários** | Sistema, Usuário Solicitante |
-| **Descrição** | Admin rejeita solicitação de acesso, alterando status do vínculo para `REJEITADO` e removendo data de aprovação. |
-| **Pré-condições** | - Admin autenticado, ADMIN aprovado na org<br>- Organização APROVADA<br>- Solicitação existe com status `PENDENTE` |
-| **Pós-condições** | - Vínculo atualizado: `status: REJEITADO`, `aprovado_em` removido (`$unset`)<br>- Usuário vê org na aba "Recusadas" e pode solicitar novamente |
-| **Fluxo Principal** | 1. Admin visualiza solicitações pendentes (RF-07)<br>2. Admin clica "Rejeitar" no card do usuário<br>3. Sistema faz `PATCH /organizacoes/:id/membros/:usuarioId` com `{ status: "REJEITADO" }`<br>4. Backend validações idênticas à aprovação<br>5. Backend faz `updateOne` com `arrayFilters`:<br>   - `$set: { 'membros.$[alvo].status': 'REJEITADO' }`<br>   - `$unset: { 'membros.$[alvo].aprovado_em': '' }`<br>6. Sistema retorna sucesso<br>7. Frontend atualiza: move usuário para aba "Recusadas", etiqueta "Solicitação recusada" (erro) |
-| **Fluxos Alternativos** | **FA-01: Mesmos de RF-08** (concorrência, permissão alterada) |
-| **Regras de Negócio** | - RN-29: Apenas ADMIN da mesma organização pode rejeitar<br>- RN-30: Rejeição remove `aprovado_em` se existia<br>- RN-31: Usuário rejeitado pode solicitar acesso novamente (novo vínculo PENDENTE) |
+| **Objetivo** | Permitir que o administrador rejeite uma solicitação de ingresso na organização. |
 | **Prioridade** | Alta |
-| **Rastreabilidade** | UC9 - Caso de uso "Rejeitar solicitação de acesso" |
+| **Pré-Condições** | O administrador deve estar autenticado e possuir permissão de administração na organização.<br>A organização deve estar aprovada.<br>A solicitação do usuário deve estar com status pendente. |
+| **Pós-Condições** | A solicitação passa para o status rejeitado e o usuário não recebe acesso à organização. |
+| **Fluxo Principal (Caminho de Sucesso)** | 1. O administrador visualiza as solicitações pendentes da organização.<br>2. O administrador seleciona a opção de rejeitar uma solicitação.<br>3. O sistema verifica se a solicitação ainda está pendente.<br>4. O sistema verifica as permissões do administrador.<br>5. O sistema altera o status da solicitação para rejeitado.<br>6. O sistema apresenta uma confirmação da operação ao administrador.<br>7. A solicitação passa a ser apresentada ao usuário como recusada. |
+| **Fluxos Alternativos** | Não se aplica. |
+| **Fluxos de Exceção** | **FE-01: Solicitação já analisada**<br>1. O sistema identifica que a solicitação não está mais pendente.<br>2. A rejeição não é realizada.<br>3. O sistema solicita a atualização da lista.<br><br>**FE-02: Administrador sem permissão**<br>1. O sistema identifica que o usuário não possui mais permissão para administrar a organização.<br>2. A operação é cancelada e o acesso é negado. |
 
 ---
 
-### RF-10: Visualizar membros aprovados
+## RF-08 - Visualizar membros da organização
 
 | Campo | Descrição |
-|-------|-----------|
-| **Código** | RF-10 |
-| **Nome** | Visualizar membros aprovados |
+|---|---|
+| **Nome do Caso de Uso** | Visualizar membros da organização |
+| **ID do Requisito (RF)** | RF-08 |
 | **Ator Principal** | Admin da Organização |
-| **Atores Secundários** | Sistema |
-| **Descrição** | Admin visualiza lista de membros com acesso aprovado na organização, ordenados por papel (admins primeiro) e nome. |
-| **Pré-condições** | - Admin autenticado, ADMIN aprovado na org<br>- Organização APROVADA |
-| **Pós-condições** | - Lista de membros aprovados exibida com ações disponíveis |
-| **Fluxo Principal** | 1. Admin acessa tela "Membros da organização"<br>2. Sistema carrega organização com membros (RF-07)<br>3. Frontend filtra `membros.status === APROVADO`<br>4. Ordena: ADMIN primeiro, depois MEMBRO, ambos por nome (pt-BR)<br>5. Exibe cards com: avatar, nome, email, papel (ADMIN/MEMBRO), etiqueta "Aprovado" (sucesso)<br>6. Para MEMBRO: exibe botão "Remover acesso"<br>7. Para ADMIN: não exibe botão remover (proteção) |
-| **Fluxos Alternativos** | **FA-01: Nenhum membro aprovado**<br>1. Frontend exibe "Não há membros aprovados" |
-| **Regras de Negócio** | - RN-32: Admins listados primeiro<br>- RN-33: Não é permitido remover administradores da organização<br>- RN-34: Apenas membros APROVADOS aparecem aqui |
+| **Objetivo** | Permitir que o administrador consulte os usuários que possuem acesso aprovado à organização. |
 | **Prioridade** | Alta |
-| **Rastreabilidade** | UC10 - Caso de uso "Visualizar membros aprovados" |
+| **Pré-Condições** | O administrador deve estar autenticado.<br>O administrador deve possuir vínculo aprovado com papel de administrador na organização.<br>A organização deve estar aprovada. |
+| **Pós-Condições** | A lista de membros aprovados da organização é apresentada ao administrador. |
+| **Fluxo Principal (Caminho de Sucesso)** | 1. O administrador acessa a opção de membros da organização.<br>2. O administrador seleciona a organização que deseja gerenciar.<br>3. O sistema consulta os membros da organização.<br>4. O sistema identifica os membros com acesso aprovado.<br>5. O sistema apresenta nome, e-mail e papel de cada membro.<br>6. Os administradores são apresentados antes dos membros comuns.<br>7. Para membros comuns, o sistema disponibiliza a opção de remoção de acesso. |
+| **Fluxos Alternativos** | **FA-01: Nenhum membro aprovado**<br>1. Não existem membros aprovados para apresentação.<br>2. O sistema informa que não há membros aprovados na organização. |
+| **Fluxos de Exceção** | **FE-01: Acesso não autorizado**<br>1. O usuário não possui permissão para administrar a organização.<br>2. O sistema bloqueia a consulta dos membros. |
 
 ---
 
-### RF-11: Remover membro da organização
+## RF-09 - Remover membro da organização
 
 | Campo | Descrição |
-|-------|-----------|
-| **Código** | RF-11 |
-| **Nome** | Remover membro da organização |
+|---|---|
+| **Nome do Caso de Uso** | Remover membro da organização |
+| **ID do Requisito (RF)** | RF-09 |
 | **Ator Principal** | Admin da Organização |
-| **Atores Secundários** | Sistema, Usuário Removido |
-| **Descrição** | Admin remove membro aprovado da organização, revogando seu acesso e removendo de comissões vinculadas. |
-| **Pré-condições** | - Admin autenticado, ADMIN aprovado na org<br>- Organização APROVADA<br>- Membro alvo: `papel: MEMBRO`, `status: APROVADO` |
-| **Pós-condições** | - Vínculo removido do array `membros` da organização<br>- Usuário removido de todas as comissões da organização<br>- Usuário pode solicitar acesso novamente no futuro |
-| **Fluxo Principal** | 1. Admin visualiza membros aprovados (RF-10)<br>2. Admin clica "Remover acesso" no card do membro<br>3. Frontend abre modal de confirmação com aviso: "A pessoa também sairá das comissões desta organização. Sua conta e vínculos com outras organizações serão preservados."<br>4. Admin confirma<br>5. Sistema faz `DELETE /organizacoes/:id/membros/:usuarioId`<br>6. Backend valida: solicitante ADMIN aprovado, alvo MEMBRO aprovado<br>7. Backend faz `updateOne` com `$pull: { membros: { usuario_id: alvoId } }`<br>8. Backend faz `updateMany` em comissões: `$pull: { membros: { usuario_id: alvoId } }`<br>9. Sistema retorna sucesso<br>10. Frontend remove card da lista, exibe mensagem de sucesso |
-| **Fluxos Alternativos** | **FA-01: Tentativa de remover ADMIN**<br>1. Backend retorna 403 "Não é permitido remover administradores"<br><br>**FA-02: Membro não está aprovado**<br>1. Backend retorna 409 "Apenas membros aprovados podem ser removidos"<br><br>**FA-03: Concorrência/permissão alterada**<br>1. Backend retorna 409 "O vínculo ou as permissões mudaram" |
-| **Regras de Negócio** | - RN-35: Não é permitido remover ADMINs da organização<br>- RN-36: Apenas membros `APROVADO` podem ser removidos<br>- RN-37: Remoção cascata em comissões da organização<br>- RN-38: Conta do usuário preservada (apenas vínculo removido) |
+| **Objetivo** | Permitir que o administrador remova o acesso de um membro aprovado da organização. |
 | **Prioridade** | Alta |
-| **Rastreabilidade** | UC11 - Caso de uso "Remover membro da organização" |
-
----
-
-### RF-12: Criar organização
-
-| Campo | Descrição |
-|-------|-----------|
-| **Código** | RF-12 |
-| **Nome** | Criar organização |
-| **Ator Principal** | Admin do Sistema |
-| **Atores Secundários** | Sistema |
-| **Descrição** | Admin do sistema cria nova organização; criador torna-se ADMIN aprovado automaticamente; organização inicia com status `PENDENTE`. |
-| **Pré-condições** | - Usuário autenticado com `tipo: ADMIN_SISTEMA`<br>- Nome único no sistema |
-| **Pós-condições** | - Organização criada com `status: PENDENTE`<br>- Criador adicionado como `ADMIN` + `APROVADO` em `membros`<br>- `criada_por` referencia o admin<br>- `solicitado_em` e `aprovado_em` preenchidos para o criador |
-| **Fluxo Principal** | 1. Admin do sistema acessa tela "Gerenciar organizações"<br>2. Admin clica "Nova organização" (ou usa API direta)<br>3. Sistema faz `POST /organizacoes` com `{ nome, descricao? }`<br>4. Backend valida: usuário existe, nome único (regex case-insensitive)<br>5. Backend cria organização com:<br>   - `status: PENDENTE`<br>   - `criada_por: adminId`<br>   - `membros: [{ usuario_id: adminId, papel: ADMIN, status: APROVADO, solicitado_em: now, aprovado_em: now }]`<br>6. Sistema retorna organização criada<br>7. Frontend lista org com etiqueta "Pendente" (alerta) |
-| **Fluxos Alternativos** | **FA-01: Nome duplicado**<br>1. Backend retorna 409 "Já existe uma organização com este nome"<br><br>**FA-02: Usuário não é ADMIN_SISTEMA**<br>1. Guard `UsuarioComumGuard` bloqueia (403) |
-| **Regras de Negócio** | - RN-39: Apenas ADMIN_SISTEMA pode criar organizações<br>- RN-40: Nome único (case-insensitive)<br>- RN-41: Criador vira ADMIN aprovado automaticamente<br>- RN-42: Nova org nasce `PENDENTE` (precisa aprovação de outro ADMIN_SISTEMA) |
-| **Prioridade** | Alta |
-| **Rastreabilidade** | UC12 - Caso de uso "Criar organização" |
-
----
-
-### RF-13: Listar todas as organizações
-
-| Campo | Descrição |
-|-------|-----------|
-| **Código** | RF-13 |
-| **Nome** | Listar todas as organizações |
-| **Ator Principal** | Admin do Sistema |
-| **Atores Secundários** | Sistema |
-| **Descrição** | Admin do sistema visualiza todas as organizações cadastradas (qualquer status) com informações de criador e status. |
-| **Pré-condições** | - Usuário autenticado com `tipo: ADMIN_SISTEMA` |
-| **Pós-condições** | - Lista completa de organizações retornada |
-| **Fluxo Principal** | 1. Admin do sistema acessa tela "Gerenciar organizações" (`/organizacoes/aprovacao`)<br>2. Sistema faz `GET /organizacoes` com token ADMIN_SISTEMA<br>3. Backend retorna todas as orgs (sem filtro de status) com populate `criada_por` e `membros.usuario_id`<br>4. Frontend ordena: PENDENTE → APROVADA → REVOGADA<br>5. Exibe cards com: nome, descrição, status (etiqueta colorida), criador, botões de ação por status |
-| **Fluxos Alternativos** | **FA-01: Nenhuma organização**<br>1. Frontend exibe "Nenhuma organização cadastrada" |
-| **Regras de Negócio** | - RN-43: ADMIN_SISTEMA vê todas orgs independente de status<br>- RN-44: Ordenação fixa: PENDENTE (0), APROVADA (1), REVOGADA (2) |
-| **Prioridade** | Alta |
-| **Rastreabilidade** | UC13 - Caso de uso "Listar todas as organizações" |
-
----
-
-### RF-14: Aprovar organização
-
-| Campo | Descrição |
-|-------|-----------|
-| **Código** | RF-14 |
-| **Nome** | Aprovar organização |
-| **Ator Principal** | Admin do Sistema |
-| **Atores Secundários** | Sistema |
-| **Descrição** | Admin do sistema altera status de organização de `PENDENTE` para `APROVADA`, permitindo solicitações de acesso. |
-| **Pré-condições** | - Admin do sistema autenticado<br>- Organização com `status: PENDENTE` |
-| **Pós-condições** | - Organização `status: APROVADA`<br>- Usuários podem solicitar acesso (RF-05)<br>- Admins da org podem gerenciar membros (RF-07 a RF-11) |
-| **Fluxo Principal** | 1. Admin do sistema visualiza lista de organizações (RF-13)<br>2. Identifica org com etiqueta "Pendente"<br>3. Clica "Autorizar"<br>4. Sistema faz `PATCH /organizacoes/:id` com `{ status: "APROVADA" }`<br>5. Backend valida: solicitante é ADMIN_SISTEMA<br>6. Backend atualiza status<br>7. Frontend atualiza etiqueta para "Aprovada" (sucesso), mostra botão "Revogar" |
-| **Fluxos Alternativos** | **FA-01: Organização já aprovada**<br>1. Botão "Autorizar" não exibido para orgs APROVADA |
-| **Regras de Negócio** | - RN-45: Apenas ADMIN_SISTEMA pode aprovar organizações<br>- RN-46: Org APROVADA habilita fluxo de solicitação de acesso por usuários comuns |
-| **Prioridade** | Alta |
-| **Rastreabilidade** | UC14 - Caso de uso "Aprovar organização" |
-
----
-
-### RF-15: Revogar organização
-
-| Campo | Descrição |
-|-------|-----------|
-| **Código** | RF-15 |
-| **Nome** | Revogar organização |
-| **Ator Principal** | Admin do Sistema |
-| **Atores Secundários** | Sistema |
-| **Descrição** | Admin do sistema altera status de organização de `APROVADA` para `REVOGADA`, bloqueando novos acessos e gestão de membros. |
-| **Pré-condições** | - Admin do sistema autenticado<br>- Organização com `status: APROVADA` |
-| **Pós-condições** | - Organização `status: REVOGADA`<br>- Novas solicitações de acesso bloqueadas<br>- Admins da org não conseguem mais gerenciar membros<br>- Preparada para exclusão (RF-16) |
-| **Fluxo Principal** | 1. Admin do sistema visualiza lista (RF-13)<br>2. Identifica org "Aprovada"<br>3. Clica "Revogar"<br>4. Sistema faz `PATCH /organizacoes/:id` com `{ status: "REVOGADA" }`<br>5. Backend valida ADMIN_SISTEMA<br>6. Backend atualiza status<br>7. Frontend atualiza etiqueta para "Revogada" (erro), mostra botão "Excluir" |
-| **Fluxos Alternativos** | **FA-01: Organização já revogada/pendente**<br>1. Botão "Revogar" só aparece para APROVADA |
-| **Regras de Negócio** | - RN-47: Apenas ADMIN_SISTEMA pode revogar<br>- RN-48: Org REVOGADA não aceita solicitações nem gestão de membros<br>- RN-49: Revogação é pré-requisito para exclusão |
-| **Prioridade** | Alta |
-| **Rastreabilidade** | UC15 - Caso de uso "Revogar organização" |
-
----
-
-### RF-16: Excluir organização
-
-| Campo | Descrição |
-|-------|-----------|
-| **Código** | RF-16 |
-| **Nome** | Excluir organização |
-| **Ator Principal** | Admin do Sistema |
-| **Atores Secundários** | Sistema |
-| **Descrição** | Admin do sistema exclui permanentemente uma organização revogada e suas comissões associadas. |
-| **Pré-condições** | - Admin do sistema autenticado<br>- Organização com `status: REVOGADA` |
-| **Pós-condições** | - Organização removida do banco<br>- Todas as comissões da organização deletadas<br>- Vínculos de usuários removidos implicitamente |
-| **Fluxo Principal** | 1. Admin do sistema visualiza org "Revogada" (RF-13)<br>2. Clica "Excluir"<br>3. Frontend abre modal de confirmação: "Excluir [nome]? A organização e as comissões dela serão apagadas de vez."<br>4. Admin confirma<br>5. Sistema faz `DELETE /organizacoes/:id`<br>6. Backend valida: ADMIN_SISTEMA + status REVOGADA (filtro no deleteOne)<br>7. Backend deleta organização<br>8. Backend deleta comissões vinculadas (`deleteMany organizacao_id`)<br>9. Sistema retorna sucesso<br>10. Frontend remove card da lista |
-| **Fluxos Alternativos** | **FA-01: Tentativa de excluir sem revogar**<br>1. Backend retorna 409 "Revogue a organização antes de excluí-la"<br><br>**FA-02: Organização não encontrada**<br>1. Backend retorna 404 |
-| **Regras de Negócio** | - RN-50: Apenas ADMIN_SISTEMA pode excluir<br>- RN-51: Exclusão só permitida se `status: REVOGADA`<br>- RN-52: Exclusão em cascata: comissões da organização também deletadas<br>- RN-53: Operação irreversível |
-| **Prioridade** | Alta |
-| **Rastreabilidade** | UC16 - Caso de uso "Excluir organização" |
-
----
-
-## Matriz de Rastreabilidade: Requisitos ↔ Casos de Uso ↔ Regras de Negócio
-
-| Requisito | Caso de Uso | Regras de Negócio Principais |
-|-----------|-------------|------------------------------|
-| RF-01 | UC1 | RN-01, RN-02, RN-03, RN-04 |
-| RF-02 | UC2 | RN-05, RN-06, RN-07 |
-| RF-03 | UC3 | RN-08, RN-09, RN-10, RN-11 |
-| RF-04 | UC4 | RN-12, RN-13, RN-14 |
-| RF-05 | UC5 | RN-15, RN-16, RN-17, RN-18 |
-| RF-06 | UC6 | RN-19, RN-20, RN-21 |
-| RF-07 | UC7 | RN-22, RN-23, RN-24 |
-| RF-08 | UC8 | RN-25, RN-26, RN-27, RN-28 |
-| RF-09 | UC9 | RN-29, RN-30, RN-31 |
-| RF-10 | UC10 | RN-32, RN-33, RN-34 |
-| RF-11 | UC11 | RN-35, RN-36, RN-37, RN-38 |
-| RF-12 | UC12 | RN-39, RN-40, RN-41, RN-42 |
-| RF-13 | UC13 | RN-43, RN-44 |
-| RF-14 | UC14 | RN-45, RN-46 |
-| RF-15 | UC15 | RN-47, RN-48, RN-49 |
-| RF-16 | UC16 | RN-50, RN-51, RN-52, RN-53 |
-
----
-
-## Glossário de Termos
-
-| Termo | Definição |
-|-------|-----------|
-| **ADMIN_SISTEMA** | Administrador global da plataforma; gerencia organizações, não participa delas |
-| **ADMIN (org)** | Administrador de uma organização específica; gerencia membros dessa org |
-| **MEMBRO** | Usuário comum aprovado em uma organização |
-| **PENDENTE** | Status inicial de organização ou solicitação de acesso, aguardando aprovação |
-| **APROVADA/APROVADO** | Status ativo, funcionalidades liberadas |
-| **REVOGADA** | Organização desativada pelo admin do sistema; não aceita novas operações |
-| **REJEITADO** | Solicitação de acesso negada pelo admin da organização |
-| **Vínculo** | Registro na array `membros` da organização: usuario_id + papel + status + datas |
-
----
-
-*Documento gerado automaticamente a partir da análise do código-fonte do projeto Conecta+ (NestJS + React Native + MongoDB).*
+| **Pré-Condições** | O administrador deve estar autenticado e possuir permissão de administração na organização.<br>A organização deve estar aprovada.<br>O usuário a ser removido deve possuir papel de membro e status aprovado. |
+| **Pós-Condições** | O vínculo do membro com a organização é removido.<br>O usuário deixa de possuir acesso à organização e às comissões vinculadas a ela.<br>A conta do usuário e seus vínculos com outras organizações permanecem inalterados. |
+| **Fluxo Principal (Caminho de Sucesso)** | 1. O administrador visualiza os membros aprovados da organização.<br>2. O administrador seleciona a opção de remover acesso de um membro.<br>3. O sistema apresenta uma confirmação da operação.<br>4. O administrador confirma a remoção.<br>5. O sistema verifica as permissões do administrador e a situação do membro.<br>6. O sistema remove o vínculo do membro com a organização.<br>7. O sistema remove o membro das comissões pertencentes à organização.<br>8. O sistema atualiza a lista de membros.<br>9. O sistema informa que o acesso foi removido com sucesso. |
+| **Fluxos Alternativos** | **FA-01: Cancelamento da remoção**<br>1. O administrador seleciona a opção de remover um membro.<br>2. O sistema solicita confirmação.<br>3. O administrador cancela a operação.<br>4. Nenhuma alteração é realizada. |
+| **Fluxos de Exceção** | **FE-01: Tentativa de remover administrador**<br>1. O administrador tenta remover um usuário que possui papel de administrador.<br>2. O sistema bloqueia a operação.<br>3. O sistema informa que administradores não podem ser removidos dessa forma.<br><br>**FE-02: Membro sem status aprovado**<br>1. O sistema identifica que o usuário não é um membro aprovado.<br>2. A remoção não é realizada.<br><br>**FE-03: Permissões ou vínculo alterados**<br>1. As permissões do administrador ou o vínculo do membro são alterados durante a operação.<br>2. O sistema cancela a remoção e solicita a atualização das informações. |

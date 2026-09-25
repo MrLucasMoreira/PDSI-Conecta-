@@ -6,295 +6,310 @@
 
 ---
 
-## Sumário
+## Visão Geral
 
-| Código | Categoria | Descrição Resumida | Prioridade |
-|--------|-----------|-------------------|------------|
-| RNF-01 | Desempenho | Tempo de resposta < 2s para operações CRUD | Alta |
-| RNF-02 | Desempenho | Login e emissão de token < 1s | Alta |
-| RNF-03 | Segurança | Senhas com bcrypt cost 10, nunca logadas | Crítica |
-| RNF-04 | Segurança | JWT assinado, expiração configurável, claims atualizados | Crítica |
-| RNF-05 | Segurança | Comunicação exclusivamente HTTPS em produção | Crítica |
-| RNF-06 | Segurança | Rate limiting em endpoints de autenticação | Alta |
-| RNF-07 | Segurança | Tokens de recuperação: SHA-256, 30 min, uso único | Alta |
-| RNF-08 | Segurança | Prevenção de enumeração de emails (mensagens genéricas) | Alta |
-| RNF-09 | Segurança | Guards de autorização em todos endpoints sensíveis | Crítica |
-| RNF-10 | Disponibilidade | Health check endpoint para monitoramento | Média |
-| RNF-11 | Confiabilidade | Operações atômicas em aprovação/rejeição/remoção (arrayFilters) | Alta |
-| RNF-12 | Confiabilidade | Soft delete usuário (ativo=false), hard delete org só se revogada | Média |
-| RNF-13 | Escalabilidade | Stateless API (JWT), horizontal scaling ready | Média |
-| RNF-14 | Usabilidade | Validação client-side + server-side com mensagens claras | Alta |
-| RNF-15 | Usabilidade | Feedback visual imediato (loading, toasts, estados vazios) | Alta |
-| RNF-16 | Manutenibilidade | Código TypeScript strict, DTOs validados (class-validator) | Média |
-| RNF-17 | Manutenibilidade | Testes unitários e e2e (Vitest) | Média |
-| RNF-18 | Operacional | Logs estruturados (erros, auditoria de ações sensíveis) | Média |
-| RNF-19 | Conformidade | LGPD: direito ao esquecimento (desativação), dados mínimos | Alta |
-| RNF-20 | Conformidade | Auditoria de ações administrativas (aprovação, remoção, exclusão) | Média |
+Os requisitos não funcionais abaixo definem critérios de qualidade, segurança, desempenho, confiabilidade e usabilidade relacionados às funcionalidades deste incremento.
+
+| Código | Categoria | Requisito | Prioridade |
+|---|---|---|---|
+| RNF-01 | Desempenho | As operações do incremento devem responder em tempo adequado ao usuário. | Alta |
+| RNF-02 | Segurança | As senhas dos usuários devem ser armazenadas de forma segura. | Crítica |
+| RNF-03 | Segurança | O acesso às funcionalidades protegidas deve exigir autenticação e autorização. | Crítica |
+| RNF-04 | Validação | Os dados informados pelo usuário devem ser validados no frontend e no backend. | Alta |
+| RNF-05 | Confiabilidade | Operações de aprovação, rejeição e remoção devem preservar a integridade dos dados. | Alta |
+| RNF-06 | Usabilidade | O sistema deve fornecer feedback claro sobre o resultado das operações. | Alta |
+| RNF-07 | Privacidade | Dados sensíveis do usuário não devem ser expostos desnecessariamente. | Crítica |
+| RNF-08 | Acessibilidade | Os principais elementos de interação devem possuir informações de acessibilidade. | Média |
+| RNF-09 | Manutenibilidade | O código do incremento deve utilizar tipagem e validação consistentes. | Média |
 
 ---
 
-## Detalhamento por Categoria
+# RNF-01 - Desempenho
+
+| Campo | Descrição |
+|---|---|
+| **Categoria** | Desempenho |
+| **Descrição** | As operações de cadastro, consulta de organizações, solicitação de acesso e gestão de membros devem apresentar resposta ao usuário em até 2 segundos em condições normais de utilização. |
+| **Aplicação** | RF-01 a RF-09 |
+| **Prioridade** | Alta |
+
+O requisito se aplica principalmente às operações de:
+
+- cadastro de usuário;
+- consulta de organizações;
+- envio de solicitação de acesso;
+- consulta de solicitações;
+- aprovação e rejeição de solicitações;
+- consulta e remoção de membros.
 
 ---
 
-### 1. Desempenho (Performance)
+# RNF-02 - Proteção das Senhas
 
-#### RNF-01: Tempo de Resposta - Operações CRUD
-| Atributo | Valor |
-|----------|-------|
-| **Descrição** | Todas as operações de cadastro, listagem, atualização e consulta devem responder em até 2 segundos sob carga normal |
-| **Métrica** | p95 < 2s, p99 < 5s |
-| **Endpoints Afetados** | `POST /usuarios`, `GET /usuarios`, `PATCH /usuarios/:id`, `GET /organizacoes`, `POST /organizacoes`, `POST /organizacoes/:id/membros`, `PATCH /organizacoes/:id/membros/:usuarioId` |
-| **Implementação Atual** | Índices MongoDB em `email`, `nome`, `status`, `membros.usuario_id`; queries com `lean()` onde possível; `populate` seletivo |
-| **Gargalos Conhecidos** | `GET /organizacoes` com populate de membros pode ser lento para orgs grandes (>500 membros) - considerar paginação futura |
-| **Teste Sugerido** | Load test com 100 usuários concorrentes criando/solicitando acesso |
+| Campo | Descrição |
+|---|---|
+| **Categoria** | Segurança |
+| **Descrição** | As senhas dos usuários não devem ser armazenadas em texto puro. O sistema deve armazenar somente o hash da senha. |
+| **Aplicação** | RF-01 - Cadastrar-se na plataforma |
+| **Prioridade** | Crítica |
 
-#### RNF-02: Tempo de Resposta - Autenticação
-| Atributo | Valor |
-|----------|-------|
-| **Descrição** | Login e emissão de JWT deve completar em < 1s |
-| **Métrica** | p95 < 1s |
-| **Endpoints** | `POST /auth/login`, `POST /auth/recuperar-conta`, `POST /auth/redefinir-senha` |
-| **Implementação Atual** | Busca única por email + bcrypt compare (cost 10 ~ 100ms) + JWT sign |
-| **Observação** | Bcrypt cost 10 é intencionalmente lento para segurança; não reduzir |
+Na implementação atual, as senhas são processadas utilizando `bcrypt` com fator de custo 10.
 
----
+O campo que contém o hash da senha não deve ser retornado em consultas comuns realizadas pela aplicação.
 
-### 2. Segurança (Security)
-
-#### RNF-03: Armazenamento Seguro de Senhas
-| Atributo | Valor |
-|----------|-------|
-| **Descrição** | Senhas nunca armazenadas em texto plano; hash bcrypt com cost 10 |
-| **Implementação** | `UsuarioService.criar`, `atualizar`, `alterarSenha` → `bcrypt.hash(senha, 10)` |
-| **Proteção Extra** | Campo `senha_hash` com `select: false` no schema (não vem em queries normais) |
-| **Compatibilidade** | Campo legado `senhaHash` mantido para migração gradual |
-| **Validação** | `AlterarSenhaDto` exige senha atual + nova diferente da atual |
-
-#### RNF-04: Autenticação Baseada em JWT
-| Atributo | Valor |
-|----------|-------|
-| **Descrição** | Tokens JWT assinados (HS256/RS256), expiração configurável, claims atualizados a cada request |
-| **Claims** | `sub` (userId), `email`, `tipo` (USUARIO/ADMIN_SISTEMA) |
-| **Renovação de Permissões** | `JwtAuthGuard` busca usuário no DB a cada request e atualiza `tipo` no `req.usuario` (permite mudança de role sem relogin) |
-| **Validação** | `UsuarioAtivoGuard` revalida `ativo: true` em rotas de organizações |
-| **Expiração** | Configurável via `JWT_EXPIRES_IN` (ex: 24h) |
-| **Logout** | Client-side (remoção do token); server-side: token invalidado se usuário desativado |
-
-#### RNF-05: Comunicação Segura (HTTPS)
-| Atributo | Valor |
-|----------|-------|
-| **Descrição** | Todas as comunicações em produção devem usar TLS 1.2+ |
-| **Implementação** | Responsabilidade da infraestrutura (reverse proxy, load balancer, cert-manager) |
-| **Headers Recomendados** | `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Content-Security-Policy` |
-| **Cookies** | Não usado (token em header Authorization); se usar cookies: `Secure`, `HttpOnly`, `SameSite=Strict` |
-
-#### RNF-06: Rate Limiting / Brute Force Protection
-| Atributo | Valor |
-|----------|-------|
-| **Descrição** | Limitar tentativas de login, cadastro e recuperação de senha por IP/usuário |
-| **Status Atual** | **Não implementado no código** - deve ser adicionado no API Gateway / NestJS `ThrottlerModule` |
-| **Recomendação** | - Login: 5 tentativas/min/IP<br>- Cadastro: 3 tentativas/min/IP<br>- Recuperação: 1 solicitação/hora/email |
-| **Prioridade** | Alta - gap de segurança identificado |
-
-#### RNF-07: Recuperação de Senha Segura
-| Atributo | Valor |
-|----------|-------|
-| **Token** | 32 bytes aleatórios (hex) → `randomBytes(32)` |
-| **Armazenamento** | Hash SHA-256 no campo `reset_senha_token_hash` (`select: false`) |
-| **Expiração** | 30 minutos (`reset_senha_expira_em`) |
-| **Uso Único** | Token invalidado após uso (`$unset` nos campos) |
-| **Entrega** | Email via Nodemailer (SMTP ou jsonTransport dev) |
-| **Prevenção Enumeração** | Mesma mensagem de sucesso mesmo se email não existir |
-
-#### RNF-08: Prevenção de Enumeração de Usuários
-| Atributo | Valor |
-|----------|-------|
-| **Descrição** | Respostas genéricas para evitar descobrir emails cadastrados |
-| **Implementação** | - Login: "Email ou senha inválidos" (não distingue usuário inexistente de senha errada)<br>- Recuperação: "Se existir conta ativa, enviaremos instruções"<br>- Cadastro: "Já existe um usuário com este email" (necessário para UX, mas expõe existência) |
-| **Mitigação Cadastro** | Considerar verificação de email antes de confirmar existência (fluxo "verifique sua caixa de entrada") |
-
-#### RNF-09: Autorização Baseada em Guards (Defesa em Profundidade)
-| Guard | Protege | Regra |
-|-------|---------|-------|
-| `JwtAuthGuard` | Todas rotas autenticadas | Token válido + usuário ativo |
-| `UsuarioAtivoGuard` | Rotas `/organizacoes/*` | Revalida `ativo: true` |
-| `AdminSistemaGuard` | `POST/PATCH/DELETE /organizacoes` (gestão org) | `tipo === ADMIN_SISTEMA` |
-| `UsuarioComumGuard` | `POST /organizacoes`, `POST/PATCH/DELETE /organizacoes/:id/membros` | `tipo !== ADMIN_SISTEMA` |
-| `exigirAdministrador` (service) | `GET/PATCH/DELETE /organizacoes/:id/membros` | `papel=ADMIN` + `status=APROVADO` na org alvo |
-| `exigirOrganizacaoAprovada` (service) | Gestão de membros | `organizacao.status === APROVADA` |
+```text
+Senha informada
+      ↓
+bcrypt
+      ↓
+senha_hash
+      ↓
+MongoDB
+```
 
 ---
 
-### 3. Disponibilidade e Confiabilidade
+# RNF-03 - Autenticação e Autorização
 
-#### RNF-10: Health Check / Monitoramento
-| Atributo | Valor |
-|----------|-------|
-| **Descrição** | Endpoint para verificar saúde da aplicação e dependências (MongoDB) |
-| **Status Atual** | **Não implementado** - recomendar `TerminusModule` (NestJS) |
-| **Sugestão** | `GET /health` → `{ status: 'ok', checks: { db: 'up', memory: 'ok' } }` |
+| Campo | Descrição |
+|---|---|
+| **Categoria** | Segurança |
+| **Descrição** | As funcionalidades que envolvem organizações e membros devem ser acessadas somente por usuários autenticados e ativos. Operações administrativas devem validar também a permissão do usuário dentro da organização. |
+| **Aplicação** | RF-02 a RF-09 |
+| **Prioridade** | Crítica |
 
-#### RNF-11: Atomicidade em Operações Críticas
-| Atributo | Valor |
-|----------|-------|
-| **Descrição** | Aprovação, rejeição e remoção de membros devem ser atômicas (evitar race conditions) |
-| **Implementação** | `OrganizacoesService.atualizarStatusMembro` e `removerMembro` usam `updateOne` com `arrayFilters` + validação `modifiedCount === 1` |
-| **Exemplo** | Aprovação: `$set: { 'membros.$[alvo].status': 'APROVADO', 'membros.$[alvo].aprovado_em': now }` com filtro `alvo.usuario_id` + `alvo.status: PENDENTE` |
-| **Garantia** | Operação em documento único MongoDB = atômica |
+Para acessar funcionalidades protegidas, o sistema deve verificar:
 
-#### RNF-12: Estratégia de Exclusão (Soft/Hard Delete)
-| Entidade | Estratégia | Detalhe |
-|----------|------------|---------|
-| `Usuario` | **Soft Delete** | `ativo: false` (mantém histórico, impede login) |
-| `Organizacao` | **Hard Delete condicional** | Só se `status: REVOGADA`; deleta comissões em cascata |
-| `MembroOrganizacao` | **Hard Delete** | `$pull` do array (remoção física do vínculo) |
-| **Recuperação** | Usuário pode ser reativado por `ADMIN_SISTEMA`; org não (precisa recriar) |
+```text
+Usuário autenticado
+        ↓
+Conta ativa
+        ↓
+Permissão necessária
+```
 
----
+Nas operações administrativas de uma organização, o usuário deve possuir vínculo com:
 
-### 4. Escalabilidade
+```text
+papel = ADMIN
+status = APROVADO
+```
 
-#### RNF-13: Arquitetura Stateless / Horizontal Scaling
-| Atributo | Valor |
-|----------|-------|
-| **Descrição** | API sem estado de sessão no servidor; escalável horizontalmente |
-| **Implementação** | JWT stateless; sessão no cliente (SecureStore/localStorage) |
-| **Dependências Externas** | MongoDB (cluster replica set), Redis (se adicionar rate limiting/cache) |
-| **Sessão** | Token no header `Authorization: Bearer <jwt>` - não usa cookies de sessão server-side |
-| **Deploy** | Múltiplas instâncias do backend atrás de load balancer |
+Dessa forma, um usuário comum não pode aprovar, rejeitar ou remover membros de uma organização que não administra.
 
 ---
 
-### 5. Usabilidade
+# RNF-04 - Validação de Dados
 
-#### RNF-14: Validação Dupla (Client + Server)
-| Atributo | Valor |
-|----------|-------|
-| **Client-Side** | React Native: `validarNome`, `validarEmail`, `validarSenha`, `validarConfirmacaoSenha` em `utils/validacao.ts` |
-| **Server-Side** | DTOs com `class-validator` (`@IsString`, `@MinLength`, `@MaxLength`, `@IsEmail`, `@IsIn`) + validações custom no Service |
-| **Mensagens** | Português brasileiro, claras e acionáveis (ex: "A nova senha deve ser diferente da senha atual") |
-| **Feedback Visual** | `FaixaAviso` (erro/sucesso/alerta/info), `CampoTexto` com `erro` prop, `Botao` com `carregando` |
+| Campo | Descrição |
+|---|---|
+| **Categoria** | Confiabilidade / Usabilidade |
+| **Descrição** | Os dados fornecidos pelos usuários devem ser validados antes de serem persistidos ou utilizados pelo sistema. |
+| **Aplicação** | RF-01 a RF-09 |
+| **Prioridade** | Alta |
 
-#### RNF-15: Feedback Visual e Estados de UI
-| Estado | Implementação Frontend |
-|--------|------------------------|
-| Carregamento lista | `Carregando` component + `carregando` state |
-| Ação em andamento | `Botao` com `carregando` + `tituloCarregando` |
-| Lista vazia | `EstadoVazio` com ícone e mensagem contextual por aba |
-| Sucesso/Erro | `FaixaAviso` com `tom: 'sucesso' \| 'erro' \| 'alerta' \| 'informacao'` |
-| Confirmação destrutiva | `Confirmacao` modal (remover membro, excluir org) |
-| Acessibilidade | `accessibilityRole`, `rotuloAcessivel`, `hitSlop` em áreas de toque |
+A validação deve ocorrer tanto na interface quanto no backend.
 
----
+Entre as validações utilizadas no incremento estão:
 
-### 6. Manutenibilidade
+- nome obrigatório e com tamanho mínimo;
+- e-mail em formato válido;
+- e-mail único no cadastro;
+- senha com pelo menos 8 caracteres;
+- confirmação da senha no frontend;
+- identificadores válidos;
+- status permitidos para solicitações;
+- verificação da existência de usuário e organização.
 
-#### RNF-16: Qualidade de Código TypeScript
-| Atributo | Valor |
-|----------|-------|
-| **Strict Mode** | `tsconfig.json` com `strict: true`, `noImplicitAny`, `strictNullChecks` |
-| **Validação DTOs** | `class-validator` + `class-transformer` + `ValidationPipe` global |
-| **Tipagem** | Interfaces/types compartilhados via `schemas/*.ts` (backend) e `services/api.ts` (frontend) |
-| **ESLint** | Configurado no frontend (`.eslintrc.js`) e backend |
-
-#### RNF-17: Cobertura de Testes
-| Atributo | Valor |
-|----------|-------|
-| **Framework** | Vitest (unit + e2e) |
-| **Config** | `vitest.config.ts`, `vitest.config.e2e.ts` |
-| **Cobertura Atual** | Arquivos `*.spec.ts` em `usuarios/`, `organizacoes/`, `auth/`, `comissoes/` |
-| **Gap** | Testes de integração para fluxos completos (cadastro → login → solicitar → aprovar) |
+A validação no backend deve ser mantida mesmo quando o frontend já tenha validado os dados.
 
 ---
 
-### 7. Operacionalidade
+# RNF-05 - Integridade e Consistência dos Dados
 
-#### RNF-18: Logs e Auditoria
-| Atributo | Valor |
-|----------|-------|
-| **Logs Atuais** | `console.log` em desenvolvimento (link recuperação senha); `console.error` em exceções |
-| **Necessário** | Logger estruturado (Pino/Winston) com níveis: `info`, `warn`, `error` |
-| **Eventos de Auditoria** | - Login bem-sucedido/falha<br>- Cadastro usuário<br>- Criação/APROVAÇÃO/REVOGAÇÃO/EXCLUSÃO organização<br>- Aprovação/Rejeição/Remoção membro<br>- Alteração de senha/recuperação |
-| **Campos Mínimos** | `timestamp`, `level`, `userId`, `action`, `resource`, `resourceId`, `ip`, `userAgent`, `success` |
+| Campo | Descrição |
+|---|---|
+| **Categoria** | Confiabilidade |
+| **Descrição** | O sistema deve preservar a consistência dos vínculos entre usuários e organizações durante solicitações e operações administrativas. |
+| **Aplicação** | RF-03, RF-06, RF-07 e RF-09 |
+| **Prioridade** | Alta |
 
----
+O sistema deve garantir que:
 
-### 8. Conformidade (LGPD / Boas Práticas)
+- um usuário não possua mais de um vínculo com a mesma organização;
+- somente solicitações com status `PENDENTE` possam ser aprovadas ou rejeitadas;
+- somente administradores aprovados da organização possam analisar solicitações;
+- somente membros aprovados possam ser removidos;
+- administradores da organização não possam ser removidos pela operação comum de remoção de membros;
+- alterações críticas de vínculo sejam realizadas de maneira consistente mesmo quando duas operações ocorrerem em um intervalo muito próximo.
 
-#### RNF-19: Proteção de Dados Pessoais (LGPD)
-| Princípio | Implementação |
-|-----------|---------------|
-| **Minimização** | Coleta apenas: nome, email, senha (hash), preferência tema |
-| **Finalidade** | Dados usados apenas para autenticação e gestão de organizações |
-| **Acesso** | Usuário vê próprio perfil (`GET /usuarios/me`) |
-| **Retificação** | `PATCH /usuarios/me` (nome, email, tema) |
-| **Exclusão/Direito ao Esquecimento** | `DELETE /usuarios/:id` (AdminSistema) → `ativo: false` (soft delete); não há endpoint de exclusão própria (gap) |
-| **Portabilidade** | Não implementado (exportar dados) |
-| **Retenção** | Dados mantidos enquanto conta ativa; desativados preservam histórico |
-
-#### RNF-20: Auditoria de Ações Administrativas
-| Ação | Quem | Log Necessário |
-|------|------|----------------|
-| Criar organização | ADMIN_SISTEMA | `orgId`, `nome`, `criada_por`, `timestamp` |
-| Aprovar/Revogar/Excluir org | ADMIN_SISTEMA | `orgId`, `acao`, `adminId`, `timestamp` |
-| Aprovar/Rejeitar solicitação | ADMIN_ORG | `orgId`, `usuarioId`, `acao`, `adminId`, `timestamp` |
-| Remover membro | ADMIN_ORG | `orgId`, `usuarioId`, `adminId`, `timestamp` |
-| Alterar senha usuário | Próprio/ADMIN_SISTEMA | `usuarioId`, `atorId`, `timestamp` |
+Na implementação MongoDB, as alterações de status e remoções são realizadas utilizando operações atômicas no documento da organização.
 
 ---
 
-## Matriz de Rastreabilidade: RNF → Código / Componente
+# RNF-06 - Feedback ao Usuário
 
-| RNF | Componente / Arquivo | Status |
-|-----|---------------------|--------|
-| RNF-01 | `UsuarioService`, `OrganizacoesService`, índices MongoDB | Implementado |
-| RNF-02 | `AuthService.login`, bcrypt cost 10 | Implementado |
-| RNF-03 | `UsuarioSchema` (`select: false`), `bcrypt.hash(..., 10)` | Implementado |
-| RNF-04 | `AuthService.login`, `JwtAuthGuard`, `JwtService` | Implementado |
-| RNF-05 | Infra (nginx/Traefik/cert-manager) | **Pendente infra** |
-| RNF-06 | **Ausente** - adicionar `ThrottlerModule` | **Gap** |
-| RNF-07 | `AuthService.solicitarRecuperacao`/`redefinirSenha` | Implementado |
-| RNF-08 | `AuthService.login`, `solicitarRecuperacao` | Parcial (cadastro expõe) |
-| RNF-09 | `auth/*.guard.ts`, `organizacoes/usuario-ativo.guard.ts`, `exigirAdministrador` | Implementado |
-| RNF-10 | **Ausente** - adicionar `TerminusModule` | **Gap** |
-| RNF-11 | `OrganizacoesService.atualizarStatusMembro`, `removerMembro` (arrayFilters) | Implementado |
-| RNF-12 | `UsuarioService.remover` (soft), `OrganizacoesService.remover` (hard condicional) | Implementado |
-| RNF-13 | JWT stateless, sem sessão server-side | Implementado |
-| RNF-14 | `utils/validacao.ts` (frontend), `dto/*.ts` + `ValidationPipe` (backend) | Implementado |
-| RNF-15 | `FaixaAviso`, `Carregando`, `EstadoVazio`, `Confirmacao`, `Botao.carregando` | Implementado |
-| RNF-16 | `tsconfig.json`, `class-validator`, ESLint | Implementado |
-| RNF-17 | `vitest.config.ts`, `*.spec.ts` | Parcial (faltam e2e fluxos completos) |
-| RNF-18 | `console.log/error` apenas | **Gap** - logger estruturado |
-| RNF-19 | Soft delete usuário, dados mínimos | Parcial (falta exportação, exclusão própria) |
-| RNF-20 | **Ausente** - auditoria estruturada | **Gap** |
+| Campo | Descrição |
+|---|---|
+| **Categoria** | Usabilidade |
+| **Descrição** | O sistema deve informar claramente ao usuário o estado e o resultado das operações realizadas. |
+| **Aplicação** | RF-01 a RF-09 |
+| **Prioridade** | Alta |
 
----
+A interface deve fornecer feedback para situações como:
 
-## Gaps Identificados e Plano de Ação Sugerido
+- carregamento de dados;
+- operação em andamento;
+- cadastro realizado com sucesso;
+- solicitação enviada;
+- solicitação aprovada;
+- solicitação rejeitada;
+- membro removido;
+- erro de validação;
+- erro de comunicação;
+- lista sem registros;
+- operações destrutivas que necessitem confirmação.
 
-| Prioridade | Gap | Ação Recomendada | Esforço |
-|------------|-----|------------------|---------|
-| **Crítica** | Rate limiting (RNF-06) | Adicionar `@nestjs/throttler` com guards em `/auth/*` e `/usuarios` | Baixo |
-| **Crítica** | HTTPS headers (RNF-05) | Configurar no reverse proxy + `helmet` no NestJS | Baixo |
-| **Alta** | Logger estruturado (RNF-18) | Integrar `pino` + `nest-pino` | Médio |
-| **Alta** | Health check (RNF-10) | Adicionar `@nestjs/terminus` | Baixo |
-| **Média** | Auditoria ações admin (RNF-20) | Interceptor/Decorator `@Audit()` + collection `auditoria` | Médio |
-| **Média** | Exportação dados usuário (RNF-19) | Endpoint `GET /usuarios/me/export` (JSON) | Baixo |
-| **Média** | Exclusão própria conta (RNF-19) | `DELETE /usuarios/me` com confirmação de senha | Baixo |
-| **Baixa** | Paginação `GET /organizacoes` (RNF-01) | `skip`/`limit` + `total` no response | Médio |
-| **Baixa** | Testes e2e fluxos completos (RNF-17) | Cenários: cadastro→login→solicitar→aprovar→remover | Alto |
+Exemplo:
+
+```text
+Usuário solicita acesso
+        ↓
+Operação em andamento
+        ↓
+Solicitação registrada
+        ↓
+Mensagem de sucesso
+```
 
 ---
 
-## Referências Técnicas
+# RNF-07 - Proteção de Dados do Usuário
 
-- **OWASP ASVS 4.0** - Authentication (V2), Session Management (V3), Access Control (V4)
-- **LGPD (Lei 13.709/2018)** - Art. 7º (bases legais), Art. 18 (direitos do titular), Art. 46 (segurança)
-- **NestJS Security Docs** - Guards, Pipes, Helmet, Throttler, Terminus
-- **MongoDB Security Checklist** - Authentication, Authorization, Encryption, Auditing
-- **bcrypt Cost Factor** - OWASP recomenda cost 10-12 (atual: 10 ✓)
+| Campo | Descrição |
+|---|---|
+| **Categoria** | Segurança / Privacidade |
+| **Descrição** | Informações sensíveis devem ser protegidas e somente os dados necessários para a funcionalidade devem ser apresentados aos usuários. |
+| **Aplicação** | RF-01 a RF-09 |
+| **Prioridade** | Crítica |
+
+O sistema deve evitar a exposição de dados sensíveis, especialmente:
+
+- senha original;
+- hash da senha;
+- informações internas de autenticação;
+- dados de usuários que não sejam necessários para a operação executada.
+
+A senha deve existir apenas durante seu processamento e não deve ser armazenada em texto puro.
+
+Nas listagens de membros são apresentados somente os dados necessários para a identificação e administração do vínculo.
 
 ---
 
-*Documento baseado na análise do código-fonte atual (NestJS + React Native + MongoDB) e boas práticas de mercado. Gaps marcados devem ser priorizados no backlog técnico.*
+# RNF-08 - Acessibilidade da Interface
+
+| Campo | Descrição |
+|---|---|
+| **Categoria** | Acessibilidade |
+| **Descrição** | Os principais elementos interativos da interface devem fornecer informações adequadas para tecnologias assistivas. |
+| **Aplicação** | RF-01 a RF-09 |
+| **Prioridade** | Média |
+
+Elementos como botões e ações importantes devem possuir descrições acessíveis sempre que necessário.
+
+Exemplos:
+
+```text
+"Pedir para participar de [organização]"
+"Remover acesso de [usuário]"
+```
+
+A interface também deve diferenciar visualmente situações como:
+
+- pendente;
+- aprovado;
+- rejeitado;
+- erro;
+- sucesso.
+
+---
+
+# RNF-09 - Manutenibilidade e Qualidade do Código
+
+| Campo | Descrição |
+|---|---|
+| **Categoria** | Manutenibilidade |
+| **Descrição** | A implementação deve utilizar tipagem, validação e separação de responsabilidades para facilitar manutenção e evolução do sistema. |
+| **Aplicação** | RF-01 a RF-09 |
+| **Prioridade** | Média |
+
+O projeto utiliza TypeScript com modo estrito, permitindo identificar inconsistências de tipo durante o desenvolvimento.
+
+No backend, a aplicação utiliza DTOs e validação de entrada para controlar os dados recebidos.
+
+As responsabilidades são separadas entre:
+
+```text
+Controller
+    ↓
+Service
+    ↓
+Model / MongoDB
+```
+
+No frontend, componentes reutilizáveis são utilizados para elementos como:
+
+- botões;
+- campos de entrada;
+- mensagens;
+- confirmações;
+- estados de carregamento;
+- estados vazios.
+
+---
+
+# Matriz de Aplicação dos Requisitos Não Funcionais
+
+| Requisito Funcional | RNFs Principais |
+|---|---|
+| RF-01 - Cadastrar-se na plataforma | RNF-01, RNF-02, RNF-04, RNF-06, RNF-07, RNF-08, RNF-09 |
+| RF-02 - Visualizar organizações disponíveis | RNF-01, RNF-03, RNF-04, RNF-06, RNF-07, RNF-08 |
+| RF-03 - Solicitar acesso à organização | RNF-01, RNF-03, RNF-04, RNF-05, RNF-06, RNF-08 |
+| RF-04 - Acompanhar status da solicitação | RNF-01, RNF-03, RNF-06, RNF-08 |
+| RF-05 - Visualizar solicitações pendentes | RNF-01, RNF-03, RNF-06, RNF-07, RNF-08 |
+| RF-06 - Aprovar solicitação de acesso | RNF-01, RNF-03, RNF-05, RNF-06, RNF-08 |
+| RF-07 - Rejeitar solicitação de acesso | RNF-01, RNF-03, RNF-05, RNF-06, RNF-08 |
+| RF-08 - Visualizar membros da organização | RNF-01, RNF-03, RNF-06, RNF-07, RNF-08 |
+| RF-09 - Remover membro da organização | RNF-01, RNF-03, RNF-05, RNF-06, RNF-08 |
+
+---
+
+## Resumo
+
+Os requisitos não funcionais definidos para este incremento concentram-se em cinco aspectos principais:
+
+```text
+Segurança
+   │
+   ├── proteção de senhas
+   ├── autenticação
+   ├── autorização
+   └── proteção de dados
+
+Confiabilidade
+   │
+   ├── validação
+   └── integridade dos vínculos
+
+Usabilidade
+   │
+   └── feedback das operações
+
+Acessibilidade
+   │
+   └── elementos acessíveis
+
+Manutenibilidade
+   │
+   └── tipagem e separação de responsabilidades
+```
