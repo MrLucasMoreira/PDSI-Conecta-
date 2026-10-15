@@ -42,7 +42,6 @@ export class Usuario {
   })
   senha_hash: string;
 
-  // Compatibilidade com contas anteriores à padronização dos campos.
   @Prop({ select: false })
   senhaHash?: string;
 

@@ -52,7 +52,6 @@ export class AuthService {
       throw new UnauthorizedException('Usuário desativado');
     }
 
-    // O campo atual tem precedência, inclusive após redefinir a senha.
     const hash = usuario.senha_hash ?? usuario.senhaHash;
     if (typeof hash !== 'string' || !hash) {
       throw new UnauthorizedException('Email ou senha inválidos');
